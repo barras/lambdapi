@@ -50,9 +50,9 @@ let rec reduce_coercions : ctxt -> term -> term option = fun c t ->
   else
     (* If the term is not a coercion, simplify subterms. *)
     let reduce_coercions_binder b =
-      let x, b = unbind b in
+      let (bound, x), b = unbind b in
       let* b = reduce_coercions c b in
-      return (bind_var x b)
+      return (bind_var ~bound x b)
     in
     match unfold t with
     | Bvar _ | Patt _ | Wild | TRef _ -> assert false
@@ -180,7 +180,7 @@ and infer_aux : problem -> ctxt -> term -> term * term * bool =
       (* Check that [t] is of type [t_ty], and refine it *)
       let t, cu_t = force pb c t t_ty in
       (* Unbind [u] and get new context with [x: t_ty ≔ t] *)
-      let (x, u) = unbind u in
+      let (_, x), u = unbind u in
       let c = (x, t_ty, Some t)::c in
       (* Infer type of [u'] and refine it. *)
       let u, u_ty, cu_u = infer pb c u in
@@ -204,7 +204,7 @@ and infer_aux : problem -> ctxt -> term -> term * term * bool =
   | Abst (dom, b) as top ->
       (* Domain must by of type Type (and not Kind) *)
       let dom, cu_dom = force pb c dom mk_Type in
-      let (x, b) = unbind b in
+      let (_, x), b = unbind b in
       let c = (x,dom,None)::c in
       let b, range, cu_b = infer pb c b in
       let range = bind_var x range in
@@ -220,7 +220,7 @@ and infer_aux : problem -> ctxt -> term -> term * term * bool =
   | Prod (dom, b) as top ->
       (* Domain must by of type Type (and not Kind) *)
       let dom, cu_dom = force pb c dom mk_Type in
-      let (x, b) = unbind b in
+      let (_, x), b = unbind b in
       let c = (x,dom,None)::c in
       let b, b_s, cu_b = type_enforce pb c b in
       let cu = cu_b || cu_dom in

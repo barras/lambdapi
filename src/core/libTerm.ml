@@ -133,16 +133,14 @@ let sym_to_var : var StrMap.t -> term -> term = fun map ->
   let rec to_var t =
     match unfold t with
     | Symb f -> (try mk_Vari (StrMap.find f.sym_name map) with Not_found -> t)
-    | Prod(a,b) -> mk_Prod (to_var a, to_var_binder b)
-    | Abst(a,b) -> mk_Abst (to_var a, to_var_binder b)
-    | LLet(a,t,u) -> mk_LLet (to_var a, to_var t, to_var_binder u)
+    | Prod(a,b) -> mk_Prod (to_var a, binder to_var b)
+    | Abst(a,b) -> mk_Abst (to_var a, binder to_var b)
+    | LLet(a,t,u) -> mk_LLet (to_var a, to_var t, binder to_var u)
     | Appl(a,b)  -> mk_Appl(to_var a, to_var b)
     | Meta(m,ts) -> mk_Meta(m, Array.map to_var ts)
     | Patt _ -> assert false
     | TRef _ -> assert false
     | _ -> t
-  and to_var_binder b =
-    let (x,b) = unbind b in bind_var x (to_var b)
   in fun t -> if StrMap.is_empty map then t else to_var t
 
 (** [codom_binder n t] returns the [n]-th binder of [t] if [t] is a product of
@@ -182,12 +180,9 @@ let fold (x:var) (t:term): term -> term =
     else
       match unfold u with
       | Appl(a,b) -> mk_Appl(aux a, aux b)
-      | Abst(a,b) ->
-          let x,b = Term.unbind b in mk_Abst(aux a, Term.bind_var x b)
-      | Prod(a,b) ->
-          let x,b = Term.unbind b in mk_Prod(aux a, Term.bind_var x b)
-      | LLet(a,d,b) ->
-          let x,b = Term.unbind b in mk_LLet(aux a, aux d, Term.bind_var x b)
+      | Abst(a,b) -> mk_Abst(aux a, Term.binder aux b)
+      | Prod(a,b) -> mk_Prod(aux a, Term.binder aux b)
+      | LLet(a,d,b) -> mk_LLet(aux a, aux d, Term.binder aux b)
       | Meta(m,us) -> mk_Meta(m,Array.map aux us)
       | _ -> u
   in

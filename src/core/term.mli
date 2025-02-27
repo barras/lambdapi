@@ -375,8 +375,9 @@ val msubst : mbinder -> term array -> term
 
 (** [unbind b] substitutes the binder [b] by a fresh variable of name [name]
    if given, or the binder name otherwise. The variable and the result of the
-   substitution are returned. *)
-val unbind : ?name:string -> binder -> var * term
+   substitution are returned. The boolean indicates whether the variable
+   occurs. *)
+val unbind : ?name:string -> binder -> (bool * var) * term
 
 (** [unbind2 f g] is similar to [unbind f], but it substitutes two binders [f]
    and [g] at once using the same fresh variable. *)
@@ -387,8 +388,10 @@ val unbind2 : ?name:string -> binder -> binder -> var * term * term
     create the fresh variables are based on those of the multiple binder. *)
 val unmbind : mbinder -> var array * term
 
-(** [bind_var x b] binds the variable [x] in [b], producing a boxed binder. *)
-val bind_var  : var -> term -> binder
+(** [bind_var ~bound x b] binds the variable [x] in [b], producing a binder.
+    bound=false means the variable should not be replaced, thereby creating a
+    binder which variable does not occur (default: bound=true). *)
+val bind_var  : ?bound:bool -> var -> term -> binder
 
 (** [binder f b] applies f inside [b]. *)
 val binder : (term -> term) -> binder -> binder

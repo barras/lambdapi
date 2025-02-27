@@ -127,9 +127,8 @@ let rec inverse : sym -> term -> term = fun s v ->
       in
       let t1 = inverse s1 a in
       let t2 =
-        let x, b = unbind b in
-        let b = inverse s2 b in
-        if occ then mk_Abst (a, bind_var x b) else b
+        if occ then mk_Abst (a, binder (inverse s2) b)
+        else inverse s2 (snd (unbind b))
       in
       add_args (mk_Symb s0) [t1;t2]
   | _ -> raise Not_found

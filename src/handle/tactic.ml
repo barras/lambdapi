@@ -193,7 +193,7 @@ let get_prod_ids env =
   let rec aux acc do_whnf t =
     match get_args t with
     | Prod(_,b), _ ->
-        let x,b = unbind b in
+        let (_,x),b = unbind b in
         aux (base_name x::acc) do_whnf b
     | _ ->
         if do_whnf then aux acc false (Eval.whnf (Env.to_ctxt env) t)
@@ -274,10 +274,10 @@ let p_term (pos:popt) :term -> p_term =
     | Symb s -> P_Iden(mk(s.sym_path,s.sym_name),false)
     | Vari v -> P_Iden(mk([],base_name v),false)
     | Appl(u,v) -> P_Appl(term u,term v)
-    | Prod(a,b) -> let x,b = unbind b in P_Prod([params x a],term b)
-    | Abst(a,b) -> let x,b = unbind b in P_Abst([params x a],term b)
+    | Prod(a,b) -> let (_,x),b = unbind b in P_Prod([params x a],term b)
+    | Abst(a,b) -> let (_,x),b = unbind b in P_Abst([params x a],term b)
     | LLet(a,t,b) ->
-        let x,b = unbind b in
+        let (_,x),b = unbind b in
         let id = Pos.make pos (base_name x) in
         P_LLet(id,[],Some(term a),term t,term b)
     | _ -> fatal pos "Unhandled term expression: %a." Print.term t

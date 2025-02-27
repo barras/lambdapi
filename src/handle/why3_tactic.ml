@@ -240,7 +240,7 @@ let rec translate_prop : config -> l2y -> term -> l2y * Why3.Term.term =
       m, Why3.Term.t_true
   | Symb s, [a;Abst(_,t)] when s == cfg.symb_ex ->
       let m,a = translate_set m a
-      and x,t = unbind t in
+      and (_,x),t = unbind t in
       let id = Why3.Ident.id_fresh (base_name x) in
       let v = Why3.Term.create_vsymbol id a in
       if Logger.log_enabled() then
@@ -251,7 +251,7 @@ let rec translate_prop : config -> l2y -> term -> l2y * Why3.Term.term =
       m, Why3.Term.t_exists_close [v] [] t
   | Symb s, [a;Abst(_,t)] when s == cfg.symb_all ->
       let m,a = translate_set m a
-      and x,t = unbind t in
+      and (_,x),t = unbind t in
       let id = Why3.Ident.id_fresh (base_name x) in
       let v = Why3.Term.create_vsymbol id a in
       if Logger.log_enabled() then

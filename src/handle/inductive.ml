@@ -48,7 +48,7 @@ let gen_safe_prefixes : inductive -> string * string * string =
     let rec add_name_from_type set t =
       match unfold t with
       | Prod(_,b) ->
-        let x,b = unbind b in
+        let (_,x),b = unbind b in
         add_name_from_type (StrSet.add (base_name x) set) b
       | _ -> set
     in
@@ -76,7 +76,7 @@ type data = { ind_var : var (** predicate variable *)
 type ind_pred_map = (sym * data) list
 
 (** [ind_typ_with_codom pos ind_sym env codom x_str a] assumes that [a] is of
-   the form [Π(i1:a1),...,Π(in:an), TYPE]. It then generates a [tbox] similar
+   the form [Π(i1:a1),...,Π(in:an), TYPE]. It then generates a [term] similar
    to this type except that [TYPE] is replaced by [codom [i1;...;in]]. The
    string [x_str] is used as prefix for the variables [ik]. *)
 let ind_typ_with_codom :
@@ -87,7 +87,7 @@ let ind_typ_with_codom :
     | (Type, _) -> codom (List.rev_map mk_Vari xs)
     | (Prod(a,b), _) ->
         let name = x_str ^ string_of_int k in
-        let (x,b) = unbind ~name b in
+        let (_,x),b = unbind ~name b in
         mk_Prod (a, bind_var x (aux (x::xs) (k+1) b))
     | _ -> fatal pos "The type of %a is not supported" sym ind_sym
   in
@@ -200,7 +200,7 @@ let fold_cons_type
                sym cons_sym sym ind_sym
     | (Prod(t,u), _) ->
        let name = x_str ^ string_of_int n in
-       let x, u = unbind ~name u in
+       let (_,x), u = unbind ~name u in
        let x = inj_var (List.length xs + n) x in
        begin
          let env, b = Env.of_prod [] "y" t in

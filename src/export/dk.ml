@@ -121,19 +121,19 @@ let rec term : bool -> term pp = fun b ppf t ->
   | Kind -> assert false
   | Symb s -> qid ppf (s.sym_path, s.sym_name)
   | Prod(t,u) ->
-    let x,u' = unbind u in
-    if binder_occur u
+    let (bound,x),u' = unbind u in
+    if bound
     then out ppf "(%a : %a -> %a)" var x (term b) t (term b) u'
     else out ppf "(%a -> %a)" (term b) t (term b) u'
   | Abst(t,u) ->
-    let x,u = unbind u in
+    let (_,x),u = unbind u in
     if b then out ppf "(%a : %a => %a)" var x (term b) t (term b) u
     else out ppf "(%a => %a)" var x (term b) u
   | Appl _ ->
     let h, ts = get_args t in
     out ppf "(%a%a)" (term b) h (List.pp (prefix " " (term b)) "") ts
   | LLet(a,t,u) ->
-    let x,u = unbind u in
+    let (_,x),u = unbind u in
     out ppf "((%a : %a := %a) => %a)" var x (term b) a (term b) t (term b) u
   | Patt(None,_,_) -> assert false
   | Patt(Some i,_,[||]) -> patt ppf i

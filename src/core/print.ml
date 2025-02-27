@@ -243,7 +243,7 @@ and term : term pp = fun ppf t ->
         begin
           match unfold b with
           | Abst(a,b) ->
-              let (x,p) = unbind b in
+              let (_,x),p = unbind b in
               out ppf "`%a %a%a, %a" sym s var x typ a func p
           | _ -> assert false
         end
@@ -273,33 +273,33 @@ and term : term pp = fun ppf t ->
     (* Product and abstraction (only them can be wrapped). *)
     | Abst(a,b)   ->
         if wrap then out ppf "(";
-        let (x,t) = unbind b in
-        out ppf "λ %a" bvar (b,x);
+        let bx,t = unbind b in
+        out ppf "λ %a" bvar bx;
         if !print_domains then out ppf ": %a, %a" func a func t
         else abstractions ppf t;
         if wrap then out ppf ")"
     | Prod(a,b)   ->
         if wrap then out ppf "(";
-        let (x,t) = unbind b in
-        if binder_occur b then
+        let (bound,x),t = unbind b in
+        if bound then
           out ppf "Π %a: %a, %a" var x appl a func t
         else out ppf "%a → %a" appl a func t;
         if wrap then out ppf ")"
     | LLet(a,t,b) ->
         if wrap then out ppf "(";
         out ppf "let ";
-        let (x,u) = unbind b in
-        bvar ppf (b,x);
+        let bx,u = unbind b in
+        bvar ppf bx;
         if !print_domains then out ppf ": %a" atom a;
         out ppf " ≔ %a in %a" func t func u;
         if wrap then out ppf ")"
   and bvar ppf (b,x) =
-    if binder_occur b then out ppf "%a" var x else out ppf "_"
+    if b then out ppf "%a" var x else out ppf "_"
   and abstractions ppf t =
     match unfold t with
     | Abst(_,b) ->
-        let (x,t) = unbind b in
-        out ppf " %a%a" bvar (b,x) abstractions t
+        let bx,t = unbind b in
+        out ppf " %a%a" bvar bx abstractions t
     | t -> out ppf ", %a" func t
   in
   func ppf t
@@ -310,10 +310,10 @@ and term : term pp = fun ppf t ->
 let rec prod : (term * bool list) pp = fun ppf (t, impl) ->
   match unfold t, impl with
   | Prod(a,b), true::impl ->
-      let x, b = unbind b in
+      let (_,x), b = unbind b in
       out ppf "Π [%a: %a], %a" var x term a prod (b, impl)
   | Prod(a,b), false::impl ->
-      let x, b = unbind b in
+      let (_,x), b = unbind b in
       out ppf "Π %a: %a, %a" var x term a prod (b, impl)
   | _ -> term ppf t
 

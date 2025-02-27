@@ -42,7 +42,7 @@ let steps : int Stdlib.ref = Stdlib.ref 0
 let hnf : (term -> term) -> (term -> term) = fun whnf ->
   let rec hnf t =
     match whnf t with
-    | Abst(a,t) -> mk_Abst(a, let x,t = unbind t in bind_var x (hnf t))
+    | Abst(a,t) -> mk_Abst(a, binder hnf t)
     | t -> t
   in hnf
 
@@ -58,9 +58,9 @@ let snf : (term -> term) -> (term -> term) = fun whnf ->
     | Symb _ -> h
     | LLet(_,t,b) -> snf (subst b t)
     | Prod(a,b) ->
-      mk_Prod(snf a, let x,b = unbind b in bind_var x (snf b))
+      mk_Prod(snf a, binder snf b)
     | Abst(a,b) ->
-      mk_Abst(snf a, let x,b = unbind b in bind_var x (snf b))
+      mk_Abst(snf a, binder snf b)
     | Appl(t,u)   -> mk_Appl(snf t, snf u)
     | Meta(m,ts)  -> mk_Meta(m, Array.map snf ts)
     | Patt(i,n,ts) -> mk_Patt(i,n,Array.map snf ts)
@@ -121,10 +121,10 @@ let eq_modulo : (config -> term -> term) -> config -> term -> term -> bool =
     let a = Config.unfold cfg a and b = Config.unfold cfg b in
     match a, b with
     | LLet(_,t,u), _ ->
-      let x,u = unbind u in
+      let (_,x),u = unbind u in
       eq {cfg with varmap = VarMap.add x t cfg.varmap} ((u,b)::l)
     | _, LLet(_,t,u) ->
-      let x,u = unbind u in
+      let (_,x),u = unbind u in
       eq {cfg with varmap = VarMap.add x t cfg.varmap} ((a,u)::l)
     | Patt(None,_,_), _ | _, Patt(None,_,_) -> assert false
     | Patt(Some i,_,ts), Patt(Some j,_,us) ->
@@ -139,7 +139,7 @@ let eq_modulo : (config -> term -> term) -> config -> term -> term -> bool =
     | Abst _, (Type|Kind|Prod _)
     | (Type|Kind|Prod _), Abst _ -> raise Exit
     | (Abst(_ ,b), t | t, Abst(_ ,b)) when Timed.(!eta_equality) ->
-      let x,b = unbind b in eq cfg ((b, mk_Appl(t, mk_Vari x))::l)
+      let (_,x),b = unbind b in eq cfg ((b, mk_Appl(t, mk_Vari x))::l)
     | Meta(m1,a1), Meta(m2,a2) when m1 == m2 ->
       eq cfg (if a1 == a2 then l else List.add_array2 a1 a2 l)
     (* cases of failure *)
@@ -163,7 +163,7 @@ let eq_modulo : (config -> term -> term) -> config -> term -> term -> bool =
     | Abst(a1,b1), Abst(a2,b2) ->
       let _,b1,b2 = unbind2 b1 b2 in eq cfg ((a1,a2)::(b1,b2)::l)
     | (Abst(_ ,b), t | t, Abst(_ ,b)) when Timed.(!eta_equality) ->
-      let x,b = unbind b in eq cfg ((b, mk_Appl(t, mk_Vari x))::l)
+      let (_,x),b = unbind b in eq cfg ((b, mk_Appl(t, mk_Vari x))::l)
     | Meta(m1,a1), Meta(m2,a2) when m1 == m2 ->
       eq cfg (if a1 == a2 then l else List.add_array2 a1 a2 l)
     | Appl(t1,u1), Appl(t2,u2) -> eq cfg ((u1,u2)::(t1,t2)::l)
@@ -393,7 +393,7 @@ and tree_walk : config -> dtree -> stack -> (term * stack) option =
              introducing variable  [id] and branching  on tree [tr].  The type
              [a] and [b] substituted are re-inserted in the stack.*)
           let walk_binder a b id tr =
-            let (bound, body) = unbind b in
+            let (_,bound), body = unbind b in
             let vars_id = VarMap.add bound id vars_id in
             let id_vars = IntMap.add id bound id_vars in
             let stk = List.reconstruct left (a::body::args) right in
@@ -515,8 +515,7 @@ let simplify : ctxt -> term -> term = fun c ->
   let rec simp t =
     match get_args (whnf ~tags c t) with
     | Prod(a,b), _ ->
-       let x, b = unbind b in
-       mk_Prod (simp a, bind_var x (simp b))
+       mk_Prod (simp a, binder simp b)
     | h, ts -> add_args_map h (whnf ~tags c) ts
   in simp
 
@@ -537,15 +536,13 @@ let unfold_sym : sym -> term -> term =
       | _ ->
           let h =
             match h with
-            | Abst(a,b) -> mk_Abst(unfold_sym a, unfold_sym_binder b)
-            | Prod(a,b) -> mk_Prod(unfold_sym a, unfold_sym_binder b)
+            | Abst(a,b) -> mk_Abst(unfold_sym a, binder unfold_sym b)
+            | Prod(a,b) -> mk_Prod(unfold_sym a, binder unfold_sym b)
             | Meta(m,ts) -> mk_Meta(m, Array.map unfold_sym ts)
             | LLet(a,t,u) ->
-                mk_LLet(unfold_sym a, unfold_sym t, unfold_sym_binder u)
+                mk_LLet(unfold_sym a, unfold_sym t, binder unfold_sym u)
             | _ -> h
           in add_args h args
-    and unfold_sym_binder b =
-      let x, b = unbind b in bind_var x (unfold_sym b)
     in unfold_sym
   in
   fun s ->

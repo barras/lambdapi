@@ -258,7 +258,7 @@ let imitate_lam : problem -> ctxt -> meta -> unit = fun p c m ->
       with Invalid_argument _ -> assert false
     in
     let of_prod a b =
-      let x,b = unbind ~name:"x" b in
+      let (_,x),b = unbind ~name:"x" b in
       let env' = Env.add "x" x a None env in
       x, a, env', b
     in

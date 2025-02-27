@@ -59,18 +59,10 @@ let symb_to_patt : Pos.popt -> (int * int) option SymMap.t -> term -> term =
       | Vari(x)     -> (mk_Vari x, ts)
       | Type        -> (mk_Type  , ts)
       | Kind        -> (mk_Kind  , ts)
-      | Abst(a,b)   ->
-          let (x, t) = unbind b in
-          let b = bind_var x (symb_to_patt t) in
-          (mk_Abst (symb_to_patt a, b), ts)
-      | Prod(a,b)   ->
-          let (x, t) = unbind b in
-          let b = bind_var x (symb_to_patt t) in
-          (mk_Prod (symb_to_patt a, b), ts)
+      | Abst(a,b)   -> (mk_Abst (symb_to_patt a, binder symb_to_patt b), ts)
+      | Prod(a,b)   -> (mk_Prod (symb_to_patt a, binder symb_to_patt b), ts)
       | LLet(a,t,b) ->
-          let (x, u) = unbind b in
-          let b = bind_var x (symb_to_patt u) in
-          (mk_LLet (symb_to_patt a, symb_to_patt t, b), ts)
+          (mk_LLet (symb_to_patt a, symb_to_patt t, binder symb_to_patt b), ts)
       | Meta(_,_)   ->
           fatal pos "A metavariable could not be instantiated in the RHS."
       | Plac _      ->

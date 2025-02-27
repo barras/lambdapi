@@ -108,7 +108,7 @@ let of_prod : ctxt -> string -> term -> env * term = fun c s t ->
   let rec build_env env t =
     try match_prod c t (fun a d b ->
             let name = Stdlib.(incr i; s ^ string_of_int !i) in
-            let x, b = unbind ~name b in
+            let (_, x), b = unbind ~name b in
             build_env (add name x a d env) b)
     with Invalid_argument _ -> env, t
   in build_env [] t
@@ -125,7 +125,7 @@ let of_prod_nth : ctxt -> int -> term -> env * term = fun c n t ->
   let rec build_env i env t =
     if i >= n then env, t
     else match_prod c t (fun a d b ->
-             let x, b = unbind b in
+             let (_, x), b = unbind b in
              build_env (i+1) (add (base_name x) x a d env) b)
   in build_env 0 [] t
 

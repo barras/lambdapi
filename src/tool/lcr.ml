@@ -109,16 +109,14 @@ let rec shift : term -> term = fun t ->
   | Wild
   | Plac _
   | TRef _ -> t
-  | Prod(a,b) -> mk_Prod (shift a, shift_binder b)
-  | Abst(a,b) -> mk_Abst (shift a, shift_binder b)
+  | Prod(a,b) -> mk_Prod (shift a, binder shift b)
+  | Abst(a,b) -> mk_Abst (shift a, binder shift b)
   | Appl(a,b) -> mk_Appl (shift a, shift b)
   | Meta(m,ts) -> mk_Meta (m, Array.map shift ts)
   | Patt(None,_,_) -> assert false
   | Patt(Some i,n,ts) -> mk_Patt (Some(-i-1), n ^ "'", Array.map shift ts)
   | Bvar _ -> assert false
-  | LLet(a,t,b) -> mk_LLet (shift a, shift t, shift_binder b)
-and shift_binder b =
-  let x, t = unbind b in bind_var x (shift t)
+  | LLet(a,t,b) -> mk_LLet (shift a, shift t, binder shift b)
 
 (** Type for pattern variable substitutions. *)
 type subs = term IntMap.t
@@ -139,15 +137,9 @@ let apply_subs : subs -> term -> term = fun s t ->
     | Patt(i,n,ts) -> mk_Patt (i, n, Array.map apply_subs ts)
     | Vari _ | Symb _ | Type | Kind -> t
     | Appl(u,v) -> mk_Appl (apply_subs u, apply_subs v)
-    | Abst(a,b) ->
-      let x,b = unbind b in
-      mk_Abst (apply_subs a, bind_var x (apply_subs b))
-    | Prod(a,b) ->
-      let x,b = unbind b in
-      mk_Prod (apply_subs a, bind_var x (apply_subs b))
-    | LLet(a,t,b) ->
-      let x,b = unbind b in
-      mk_LLet (apply_subs a, apply_subs t, bind_var x (apply_subs b))
+    | Abst(a,b) -> mk_Abst (apply_subs a, binder apply_subs b)
+    | Prod(a,b) -> mk_Prod (apply_subs a, binder apply_subs b)
+    | LLet(a,t,b) -> mk_LLet (apply_subs a, apply_subs t, binder apply_subs b)
     | Meta(m,ts) -> mk_Meta (m, Array.map apply_subs ts)
     | Bvar _ -> assert false
     | TRef _ -> assert false
@@ -236,8 +228,7 @@ let unif : Pos.popt -> term -> term -> term IntMap.t option =
       | Appl(a,b), Appl(c,d) -> unif s ((a,c)::(b,d)::l)
       | Abst(a,b), Abst(c,d)
       | Prod(a,b), Prod(c,d) ->
-        let x,b = unbind b in
-        let d = subst d (mk_Vari x) in
+        let _x,b,d = unbind2 b d in
         unif s ((a,c)::(b,d)::l)
       | Vari x, Vari y ->
         if eq_vars x y then unif s l else raise NotUnifiable
@@ -408,9 +399,7 @@ let typability_constraints : Pos.popt -> term -> subs option = fun pos t ->
       in mk_Meta(m,[||])
     | Appl(a,b) -> mk_Appl_not_canonical(patt_to_meta a, patt_to_meta b)
     | Symb _ | Vari _ -> t
-    | Abst(a,b) ->
-      let x,b = unbind b in
-      mk_Abst(patt_to_meta a, bind_var x (patt_to_meta b))
+    | Abst(a,b) -> mk_Abst(patt_to_meta a, binder patt_to_meta b)
     | _ -> assert false
   in
   let t = patt_to_meta t in

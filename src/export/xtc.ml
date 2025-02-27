@@ -96,7 +96,7 @@ and head : term pp = fun ppf t ->
   | Patt(Some i,_,ts) -> pvar_app ppf (i,ts)
   | Appl(t,u) -> out ppf "<application>%a%a</application>" term t term u
   | Abst(a,b) ->
-    let x, b = unbind b in add_bvar x;
+    let (_,x), b = unbind b in add_bvar x;
     out ppf "<lambda>%a%a%a</lambda>" bvar x typ a term b
   | Prod _ -> assert false
   | LLet(a,t,b) -> term ppf (mk_Appl(mk_Abst(a,b),t))
@@ -126,7 +126,7 @@ and typ : term pp = fun ppf t ->
   | Abst _ -> fatal_no_pos "Dependent type."
   | Prod(a,b) ->
     if binder_occur b then fatal_no_pos "Dependent type." else
-    let x, b = unbind b in add_bvar x;
+    let (_,x), b = unbind b in add_bvar x;
     out ppf "<type><arrow>%a%a</arrow></type>" typ a typ b
   | LLet(_,t,b) -> typ ppf (subst b t)
 
@@ -155,8 +155,7 @@ let add_pvars : sym -> rule -> unit = fun s r ->
       begin
         match unfold a with
         | Patt(Some i,_,[||]) ->
-          let x,b = unbind b in
-          mk_Abst(!type_of_pvar.(i), bind_var x (subst_patt b))
+          mk_Abst(!type_of_pvar.(i), binder subst_patt b)
         | Patt(Some _,_,_) -> assert false (*FIXME*)
         | _ -> assert false
       end

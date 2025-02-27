@@ -59,6 +59,9 @@ let eq_vars : var -> var -> bool = fun x y -> compare_vars x y = 0
 let new_var : string -> var =
   let n = Stdlib.ref 0 in fun name -> incr n; !n, name
 
+(** [dummy_var] is the shared variable used in arrow types. *)
+let dummy_var = new_var "_"
+
 (** [new_var_ind s i] creates a new [var] of name [s ^ string_of_int i]. *)
 let new_var_ind : string -> int -> var = fun s i ->
   new_var (Escape.add_prefix s (string_of_int i))
@@ -663,8 +666,7 @@ let is_closed_mbinder : mbinder -> bool =
         (fun _ -> ()) (fun _ -> raise Exit) (fun _ -> ()) b; true
   with Exit -> false
 
-(** [subst b v] substitutes the variable bound by [b] with the value [v].
-    Assumes v is closed (since only called from outside the term library. *)
+(** [subst b v] substitutes the variable bound by [b] with the value [v]. *)
 let subst : binder -> term -> term = fun (bi,tm,env) v ->
   let rec subst t =
     match unfold t with
@@ -688,10 +690,10 @@ let subst : binder -> term -> term = fun (bi,tm,env) v ->
 (** [unbind b] substitutes the binder [b] by a fresh variable of name [name]
    if given, or the binder name otherwise. The variable and the result of the
    substitution are returned. *)
-let unbind : ?name:string -> binder -> var * term =
+let unbind : ?name:string -> binder -> (bool * var) * term =
   fun ?(name="") ((bn,_,_) as b) ->
   let n = if name="" then bn.binder_name else name in
-  let x = new_var n in x, subst b (Vari x)
+  let x = new_var n in (bn.binder_bound, x), subst b (Vari x)
 
 (** [unbind2 f g] is similar to [unbind f], but it substitutes two binders [f]
    and [g] at once using the same fresh variable. *)
@@ -708,8 +710,17 @@ let unmbind : mbinder -> var array * term =
   let xs = Array.init (Array.length names) (fun i -> new_var names.(i)) in
   xs, msubst b (Array.map (fun x -> Vari x) xs)
 
-(** [bind_var x t] binds the variable [x] in [t], producing a binder. *)
-let bind_var  : var -> term -> binder = fun ((_,n) as x) t ->
+(** [bind_var ~bound x t] binds the variable [x] in [t], producing a binder.
+    If [bound=false], then the variable is not bound. It is always safe to
+    have [bound=true], the default.
+
+    The [bound] argument is typically used with the information returned by
+    [unbind] when we know that the variable [x] is not used in term [t].
+ *)
+let bind_var : ?bound:bool -> var -> term -> binder =
+  fun ?(bound=true) ((_,n) as x) t ->
+  if not bound then ({binder_name=n;binder_bound=false},t,[||])
+  else
   let bound = Stdlib.ref false in
   (* Replace variables [x] by de Bruijn index [i] *)
   let rec bind i t =
@@ -761,7 +772,7 @@ let bind_var  : var -> term -> binder = fun ((_,n) as x) t ->
 
 (** [binder f b] applies f inside [b]. *)
 let binder : (term -> term) -> binder -> binder = fun f b ->
-  let x,t = unbind b in bind_var x (f t)
+  let (bound,x),t = unbind b in bind_var ~bound x (f t)
 
 (** [bind_mvar xs t] binds the variables of [xs] in [t] to get a binder.
     It is the equivalent of [bind_var] for multiple variables. *)
@@ -855,7 +866,7 @@ let mk_Type = Type
 let mk_Kind = Kind
 let mk_Symb x = Symb x
 let mk_Prod (a,b) = Prod (a,b)
-let mk_Arro (a,b) = let x = new_var "_" in Prod(a, bind_var x b)
+let mk_Arro (a,b) = Prod(a, bind_var ~bound:false dummy_var b)
 let mk_Abst (a,b) = Abst (a,b)
 let mk_Meta (m,ts) = (*assert (m.meta_arity = Array.length ts);*) Meta (m,ts)
 let mk_Patt (i,s,ts) = Patt (i,s,ts)

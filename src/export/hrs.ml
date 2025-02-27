@@ -105,13 +105,13 @@ let rec term : term pp = fun ppf t ->
     out ppf "%a(%a%a)" pvar i term ts.(0) args ts
   | Appl(t,u) -> out ppf "A(%a,%a)" term t term u
   | Abst(a,b) ->
-    let x, b = unbind b in add_bvar x;
+    let (_,x), b = unbind b in add_bvar x;
     out ppf "L(%a,\\%a.%a)" term a bvar x term b
   | Prod(a,b) ->
-    let x, b = unbind b in add_bvar x;
+    let (_,x), b = unbind b in add_bvar x;
     out ppf "P(%a,\\%a.%a)" term a bvar x term b
   | LLet(a,t,b) ->
-    let x, b = unbind b in add_bvar x;
+    let (_,x), b = unbind b in add_bvar x;
     out ppf "B(%a,%a,\\%a.%a)" term a term t bvar x term b
 
 (** [rule ppf r] translates the pair of terms [r] as a rule. *)
