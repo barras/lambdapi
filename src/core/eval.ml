@@ -40,6 +40,87 @@ let eta_equality : bool Timed.ref = Console.register_flag "eta_equality" false
 (** Counter used to preserve physical equality in {!val:whnf}. *)
 let steps : int Stdlib.ref = Stdlib.ref 0
 
+(*
+let counter, reset =
+  let l = Stdlib.ref [] in
+  (fun () ->
+    let r = Stdlib.ref 0 in
+    l := r :: !l;
+    r),
+  (fun () -> List.iter (fun r -> r := 0) !l)
+
+let cut=true
+let ins = counter ()
+let perm = counter ()
+let ac = counter()
+
+let stat() =
+  out Stdlib.(!Error.err_fmt)
+  (*Printf.printf*) "ac: %d\tinsert: %d\tperm: %d\n" !ac !ins !perm; reset()
+
+let _ = at_exit stat
+*)
+(** {1 Simple term manipulations related to AC *)
+
+
+let get_ac f t =
+  let rec aliens acc ts =
+    match ts with
+    | [] -> List.rev acc
+    | t::ts -> aux acc t ts
+  and aux acc t ts =
+    match get_args t with
+    | Symb g, [u1;u2] when g == f -> aux acc u1 (u2::ts)
+    | _ -> aliens (t::acc) ts in
+  aux [] t []
+
+(* Checks whether [t1] and [t2] are both AC expressions (over the same operation),
+   assuming that both [t1] and [t2] are in whnf
+   In case of success [ac] is called with both alien lists,
+   otherwise [nonac] is called with both heads and arguments. 
+*)
+let get2_args_or_ac t1 t2 ~ac ~nonac =
+  match get_args t1, get_args t2 with
+  | (Symb f,[_;_]),(Symb g,[_;_]) when f==g && is_ac f -> ac f (get_ac f t1) (get_ac f t2)
+  | (h1,stk1),(h2,stk2) -> nonac h1 stk1 h2 stk2
+     
+
+(** [app2 s t1 t2] builds the application of [s] to [t1] and [t2]. *)
+let app2 s t1 t2 = Appl(Appl(Symb s, t1), t2)
+
+(** [left_comb (+) [t1;t2;t3]] generates [((t1+t2)+t3)]. *)
+let left_comb s =
+  let rec comb acc ts =
+    match ts with
+    | [] -> acc
+    | t::ts -> comb (app2 s acc t) ts
+  in
+  function
+  | [] | [_] -> assert false
+  | t::ts -> comb t ts
+
+(** [right_comb (+) [t1;t2;t3]] generates [(t1+(t2+t3))]. *)
+let right_comb s =
+  let rec comb ts acc =
+    match ts with
+    | [] -> acc
+    | t::ts -> comb ts (app2 s t acc)
+  in
+  fun ts ->
+  match List.rev ts with
+  | [] | [_] -> assert false
+  | t::ts -> comb ts t
+
+(** [comb s norm ts] computes the [norm]-form of the comb obtained by applying
+    [s] to [ts]. *)
+let comb s =
+  match s.sym_prop with
+  | AC Left -> left_comb s
+  | AC Right -> right_comb s
+  | _ -> assert false
+
+
+
 (** {1 Define reduction functions parametrised by {!whnf}} *)
 
 (** [hnf whnf t] computes a hnf of [t] using [whnf]. *)
@@ -92,21 +173,20 @@ let eq_modulo : (term -> term) -> term eq = fun norm ->
        perhaps do it more incrementally (the reduction of beta-redexes, let's
        and local definitions as done in whnf could be integrated here) and,
        when both heads are function symbols, use an heuristic like in Matita
-       to decide which side to unfold first.
-
-       Note also that, when comparing two AC symbols, we could detect the
-       non-equivalence more quickly by testing the equality of the number of
-       aliens:
-
-    | (Symb f,([_;_]as ts)), (Symb g,([_;_]as us)) when is_ac f && g == f ->
-        let ts = aliens f norm ts and us = aliens f norm us in
-        let a = comb f norm ts and b = comb f norm us in
-        let ts = comb_aliens f a and us = comb_aliens f b in
-        if List.length ts <> List.length us then raise Exit
-        else eq (List.rev_append2 ts us l) *)
+       to decide which side to unfold first. *)
     let a = norm a and b = norm b in
     if Logger.log_enabled () then
       log_conv "eq_modulo after norm %a ≡ %a" term a term b;
+    get2_args_or_ac a b
+      (* AC case *)
+      ~ac:(fun _f al bl ->
+        if List.length al <> List.length bl then raise Exit;
+        (* Here, we could avoid re-reducing the terms of al and bl *)
+        eq (List.rev_append2 al bl l))
+      ~nonac:(fun a astk b bstk ->
+        (* Non-AC case *)
+    if List.length astk <> List.length bstk then raise Exit;
+    let l = List.rev_append2 astk bstk l in
     match a, b with
     | Patt(None,_,_), _ | _, Patt(None,_,_) -> assert false
     | Patt(Some i,_,ts), Patt(Some j,_,us) ->
@@ -123,8 +203,8 @@ let eq_modulo : (term -> term) -> term eq = fun norm ->
     | Meta(m1,a1), Meta(m2,a2) when m1 == m2 ->
       eq (if a1 == a2 then l else List.add_array2 a1 a2 l)
     | Bvar _, _ | _, Bvar _ -> assert false
-    | Appl(t1,u1), Appl(t2,u2) -> eq ((u1,u2)::(t1,t2)::l)
-    | _ -> raise Exit
+    | Appl _, _ | _, Appl _ -> assert false
+    | _ -> raise Exit)
   in
   fun a b ->
   try eq [(a,b)]; true
@@ -164,6 +244,7 @@ let to_tref : term -> term = fun t ->
 (** {1 Define the main {!whnf} function that takes a {!config} as argument} *)
 let depth = Stdlib.ref 0
 
+let deep f x = incr depth; let v = f x in decr depth; v
 let incr_depth f = incr depth; let v = f() in decr depth; v
 
 (** [tree_walk norm dt stk] tries to apply a rewrite rule by matching the
@@ -213,7 +294,7 @@ let tree_walk : (term -> term) -> dtree -> stack -> (term * stack) option =
         let next =
           match cond with
           | CondNL(i, j) ->
-              if incr_depth (fun () -> eq_modulo norm vars.(i) vars.(j))
+              if incr_depth (fun () -> (*log_whnf"start NL";*)let r=eq_modulo norm vars.(i) vars.(j) in (*log_whnf"end NL";*) r)
               then ok else fail
           | CondFV(i,xs) ->
               let allowed =
@@ -264,7 +345,9 @@ let tree_walk : (term -> term) -> dtree -> stack -> (term * stack) option =
           Option.bind default fn
         else
           let s = Stdlib.(!steps) in
+(*          let _ = log_whnf "Node start reduce" in*)
           let (t, args) = incr_depth (fun () -> get_args (norm examined)) in
+(*          let _ = log_whnf "Node end reduce" in*)
           let args = if store then List.map to_tref args else args in
           (* If some reduction has been performed by [norm] ([steps <>
              0]), update the value of [examined] which may be stored into
@@ -375,152 +458,225 @@ let tree_walk : (term -> term) -> dtree -> stack -> (term * stack) option =
     3. a {!constructor:Tree_type.TC.t.Vari} which is a simplified
        representation of a variable for trees. *)
 
-(** [insert t ts] inserts [t] in [ts] assuming that [ts] is in increasing
-    order wrt [Term.comp]. *)
-let insert t =
+
+(** {1 A total order on terms.}
+    It is stable by reduction because it compares normal forms.
+    However it is not stable by instantiation (of Meta) and mutation (TRef).
+    For efficiency reasons it proceeds like the conversion test:
+    the normal form is computed lazily, by performing weak head
+    reduction and comparing heads. If heads have the same constructor
+    proceed recursively on subterms (left to right lexico order). If
+    they differ, they are ordered according to the constructor tag.
+
+    Note: bound variables are greater than free variable. Hence, in
+      [λx. λy. f(x,y,z)], we have [z<x<y] because [x] becomes free before [y].
+
+    Currently, it is not antisymmetric (Meta and Patt cases). This should not be
+    an issue since we cannot match against those constructors. *)
+
+(** First a little library of comparison functions with effect *)
+
+type 'a effect_comparison_function = 'a -> 'a -> int * 'a *  'a
+
+(* Case when [f] has no effect on its input *)
+let fpure f a b = (f a b, a, b)
+
+let _lexf f1 f2 c (a1,a2) (b1,b2) =
+  let cmp1,a1',b1' = f1 a1 b1 in
+  if cmp1 <> 0 then (cmp1, c a1' a2, c b1' b2)
+  else
+    let cmp2,a2',b2' = f2 a2 b2 in
+    (cmp2, c a1' a2', c b1' b2')
+
+let _lex3f f1 f2 f3 c (a1,a2,a3) (b1,b2,b3) =
+  let cmp1,a1',b1' = f1 a1 b1 in
+  if cmp1 <> 0 then (cmp1, c a1' a2 a3, c b1' b2 b3)
+  else
+    let cmp2,a2',b2' = f2 a2 b2 in
+    if cmp2 <> 0 then (cmp2, c a1' a2' a3, c b1' b2' b3)
+    else
+      let cmp3,a3',b3' = f3 a3 b3 in
+      (cmp3, c a1' a2' a3', c b1' b2' b3')
+
+(* Same as [lexf] but avoids using [mk] when [f1] and [f2] have no effect. 
+   It Assumes [c a1 a2] is equal to [a] and [c b1 b2] is equal to [b]. *)
+let sharing_lexf f1 f2 mk a b =
+  fun (a1,a2) (b1,b2) ->
+  let cmp1,a1',b1' = f1 a1 b1 in
+  if cmp1 <> 0 then
+    let a' = if a1==a1' then a else mk a1' a2 in
+    let b' = if b1==b1' then b else mk b1' b2 in
+    (cmp1, a', b')
+  else
+    let cmp2,a2',b2' = f2 a2 b2 in
+    let a' = if a1==a1' && a2==a2' then a else mk a1' a2' in
+    let b' = if b1==b1' && b2==b2' then b else mk b1' b2' in
+    (cmp2, a', b')
+
+let sharing_lex3f f1 f2 f3 mk a b =
+  fun (a1,a2,a3) (b1,b2,b3) ->
+  let cmp1,a1',b1' = f1 a1 b1 in
+  if cmp1 <> 0 then
+    let a' = if a1==a1' then a else mk a1' a2 a3 in
+    let b' = if b1==b1' then b else mk b1' b2 b3 in
+    (cmp1, a', b')
+  else
+    let cmp2,a2',b2' = f2 a2 b2 in
+    if cmp2 <> 0 then
+      let a' = if a1==a1' && a2==a2' then a else mk a1' a2' a3 in
+      let b' = if b1==b1' && b2==b2' then b else mk b1' b2' b3 in
+      (cmp2, a', b')
+    else
+      let cmp3,a3',b3' = f3 a3 b3 in
+      let a' = if a1==a1' && a2==a2' && a3==a3' then a else mk a1' a2' a3' in
+      let b' = if b1==b1' && b2==b2' && b3==b3' then b else mk b1' b2' b3' in
+      (cmp3, a', b')
+
+(* Left to right lexicogrpahic order on list, assuming
+   lists of same length *)
+let rec flist f al bl =
+  match al,bl with
+    | a::al', b::bl' ->
+       sharing_lexf f (flist f) (fun x l -> x::l) al bl (a,al') (b,bl')
+    | [], [] -> (0,[],[])
+    | _ -> assert false
+
+
+(* t1 and t2 are aliens in whnf *)
+let norm_cmp norm : term effect_comparison_function =
+  let rec cmp t1 t2 = cmp_nf (norm t1) (norm t2)
+  and cmp_nf t1 t2 =
+    get2_args_or_ac t1 t2
+      ~ac:(fun f l1 l2 ->
+        sharing_lexf (fpure Stdlib.compare) (flist cmp_nf) (fun _ l -> comb f l)
+          t1 t2 (List.length l1,l1) (List.length l2,l2))
+      ~nonac:(fun h1 stk1 h2 stk2 ->
+        (* 3-way lexico: first compare # of arguments, then the head, and
+           the arguments (left to right) *)
+        sharing_lex3f (fpure Stdlib.compare) cmp_head (flist cmp) (fun _ h stk -> add_args h stk)
+          t1 t2 (List.length stk1, h1,stk1) (List.length stk2, h2, stk2))
+  and cmp_head t1 t2 =
+  match unfold t1, unfold t2 with
+  | Vari x, Vari x' -> (compare_vars x x',t1,t2)
+  | Type, Type
+  | Kind, Kind
+  | Wild, Wild -> (0,t1,t2)
+  | Symb s, Symb s' -> Sym.compare s s', t1,t2
+  | Prod(t,u), Prod(t',u') ->
+     sharing_lexf cmp cmp_binder (fun t u->Prod(t,u)) t1 t2 (t,u) (t',u')
+  | Abst(t,u), Abst(t',u') ->
+     sharing_lexf cmp cmp_binder (fun t u->Abst(t,u)) t1 t2 (t,u) (t',u')
+  | LLet(a,t,u), LLet(a',t',u') ->
+     sharing_lex3f cmp cmp cmp_binder (fun a t u->LLet(a,t,u)) t1 t2 (a,t,u) (a',t',u')
+  (* Non antisymmetric cases (Meta and Patt could be improved): *)
+  | Meta(m,_ts), Meta(m',_ts') -> (Meta.compare m m', t1, t2)
+  | Patt(i,_,_), Patt(i',_,_) -> (Stdlib.compare i i', t1, t2)
+  | TRef _, TRef _ -> (0, t1, t2)
+  (* Absurd cases *)
+  | Appl _, _ | _, Appl _ -> assert false
+  | Bvar _, _ | _, Bvar _ -> assert false
+  (* Diagonal cases *)
+  | t, t' -> (cmp_tag t t', t, t')
+  and cmp_binder b1 b2 =
+    (* [x] is always greater than the variables in [b1] and [b2],
+       so the order does not depend on the choice of [x]. *)
+    let (x,t1,t2) = unbind2 b1 b2 in
+    let (c,t1',t2') = cmp t1 t2 in
+    (c, bind_var x t1', bind_var x t2')
+  in cmp_nf
+
+(** {1 AC normaliaation} *)
+
+let insert norm ord t =
+  (*incr ins;*)
   let rec aux ts =
     match ts with
-    | t1::ts when cmp t t1 > 0 -> t1::aux ts
-    | _ -> t::ts
-  in aux
+    | [] -> [t]
+    | t1::ts ->
+       let (c,t,t1) = norm t t1 in
+       if ord c then
+         (* If [t] is not inserted in head position, then commutativity (and assoc) is used *)
+         ((*incr perm;*) Stdlib.incr steps; t1::aux ts)
+       else t::t1::ts in
+  aux
 
-(** [aliens f norm ts] computes the f-aliens of [ts]. f-aliens are normalized
-    wrt [norm] and ordered in increasing order wrt [Term.comp]. *)
-let aliens f norm =
-  let rec aliens acc ts =
-    match ts with
-    | [] -> acc
-    | t::ts -> aux acc t ts
-  and aux acc t ts =
-    match get_args t with
-    | Symb g, [u1;u2] when g == f -> aux acc u1 (u2::ts)
-    | _ ->
-        let n = !steps in
-        let t' = norm t in
-        if !steps = n then aliens (insert t acc) ts
-        else aux acc t' ts
-  in aliens []
+let left_insert norm t acc = insert (norm_cmp norm) (fun c -> c > 0) t acc
+let right_insert norm t racc = insert (norm_cmp norm) (fun c -> c < 0) t racc
 
-(*
-(** [left_comb_aliens f t] computes the aliens of [t] assuming that [t] is a
-    left comb. *)
-let left_comb_aliens f =
-  let rec aliens acc t =
-    match get_args t with
-    | Symb g, [t1;t2] when g == f -> aliens (t2::acc) t1
-    | _ -> t::acc
-  in aliens []
 
-(** [right_comb_aliens f t] computes the aliens of [t] assuming that [t] is a
-    right comb. *)
-let right_comb_aliens f =
-  let rec aliens acc t =
-    match get_args t with
-    | Symb g, [t1;t2] when g == f -> aliens (t1::acc) t2
-    | _ -> t::acc
-  in aliens []
+(* Determines whether [t] reduces to [f t1 t2] and call [ac], otherwise
+   call [nonac] with the reduced form of [t].
+   /!\ It is essential to match t before trying to reduce [t], otherwise exponential behavior
+   The idea is that destructing an AC term in whnf should be linear.
 
-(** [comb_aliens f t] computes the aliens of [t] assuming that [t] is a
-    comb. *)
-let comb_aliens f =
+   Alternatively, we may require that [norm] performs no AC in head position.
+   This would be even better, e.g. for f(t1,a) when a reduces to f(t2,t3)
+   we could avoid sorting [t2;t3], then [t1;t2;t3] *)
+let dest_ac norm f t ~ac ~nonac =
+  match get_args t with
+  | Symb g, [t1;t2] when f==g -> ac t1 t2
+  | _ -> 
+     let t = norm t in
+     (match get_args t with
+     | Symb g, [t1;t2] when f==g -> ac t1 t2
+     | _ -> nonac t) 
+
+
+(* /!\ left aliens in reverse order
+   [acc] sorted in increasing order *)
+let rec left_comb_aliens norm f rlts t2 acc =
+  dest_ac norm f t2
+    ~ac:(fun t21 t22 ->
+      (* If [t2] is [f t21 t21] then we apply associativity *)
+      Stdlib.incr steps;
+      left_comb_aliens norm f (t21::rlts) t22 acc)
+    ~nonac:(fun t2' ->
+      (* If [t2] (reduced to [t2']) is an alien we insert it in acc *)
+      let acc' = left_insert norm t2' acc in
+      (match rlts with
+        [] -> left_comb f acc'
+      | t1::rlts -> left_comb_aliens norm f rlts t1 acc'))
+
+(* /!\ right aliens in regular order
+   [acc] sorted in decreasing order *)
+let rec right_comb_aliens norm f t1 rts racc =
+  dest_ac norm f t1
+    ~ac:(fun t11 t12 ->
+      Stdlib.incr steps;
+      right_comb_aliens norm f t11 (t12::rts) racc)
+    ~nonac:(fun t1' ->
+      let racc' = right_insert norm t1' racc in
+      (match rts with
+        [] -> right_comb f (List.rev racc')
+      | t2::rrts -> right_comb_aliens norm f t2 rts racc'))
+
+let comb_aliens norm f t1 t2 =
   match f.sym_prop with
-  | AC Left -> left_comb_aliens f
-  | AC Right -> right_comb_aliens f
-  | _ -> assert false
-*)
-
-(** [app2 s t1 t2] builds the application of [s] to [t1] and [t2]. *)
-let app2 s t1 t2 = Appl(Appl(Symb s, t1), t2)
-
-(** [left_comb norm (+) [t1;t2;t3]] computes [norm(norm(t1+t2)+t3)]. *)
-let left_comb s norm =
-  let rec comb acc ts =
-    match ts with
-    | [] -> acc
-    | t::ts -> comb (norm (app2 s acc t)) ts
-  in
-  function
-  | [] | [_] -> assert false
-  | t::ts -> comb t ts
-
-(** [right_comb norm (+) [t1;t2;t3]] computes [norm(t1+norm(t2+t3))]. *)
-let right_comb s norm =
-  let rec comb ts acc =
-    match ts with
-    | [] -> acc
-    | t::ts -> comb ts (norm (app2 s t acc))
-  in
-  fun ts ->
-  match List.rev ts with
-  | [] | [_] -> assert false
-  | t::ts -> comb ts t
-
-(** [comb s norm ts] computes the [norm]-form of the comb obtained by applying
-    [s] to [ts]. *)
-let comb s =
-  match s.sym_prop with
-  | AC Left -> left_comb s
-  | AC Right -> right_comb s
+  | AC Left -> left_comb_aliens norm f [t1] t2 []
+  | AC Right -> right_comb_aliens norm f t1 [t2] []
   | _ -> assert false
 
-(** [sym_norm s t] computes the normal form of [t] wrt [s] rules. *)
-let sym_norm s =
-  let rec norm ((h,ts) as v) =
-    match h with
-    | Symb s' when s' == s ->
-        begin
-          match tree_walk (fun t -> t) Timed.(!(s.sym_dtree)) ts with
-          | None -> v
-          | Some v ->
-              if Logger.log_enabled () then
-                log_whnf "%aapply rewrite rule" D.depth !depth;
-              Stdlib.incr steps; norm v
-        end
-    | _ -> v
-  in
-  fun t ->
-  if Logger.log_enabled() then
-    log_whnf "%asym_norm %a" D.depth !depth term t;
-  let h,ts = norm (get_args t) in add_args h ts
 
 (** [ac norm t] computes a head-AC [norm] form. *)
 let ac norm t =
-  let t = norm t in
   match get_args t with
-  | Symb f, ([t1;t2] as ts) ->
-      begin match f.sym_prop with
-      | AC _ -> comb f norm (aliens f norm ts)
-      | Commu when cmp t1 t2 > 0 -> app2 f t2 t1
-      | _ -> t
-      end
-  | _ -> t
-
-(** If [t] is headed by an AC symbol, then [ac norm t] computes its head-AC
-    [norm] form. *)
-let new_ac t =
-  match get_args t with
-  | Symb s, ([t1;t2] as ts) ->
-      begin match s.sym_prop with
-      | AC _ -> comb s (sym_norm s) (aliens s (fun t -> t) ts)
-      | Commu when cmp t1 t2 > 0 -> app2 s t2 t1
-      | _ -> t
-      end
-  | _ -> t
-
-(** If [t] is headed by a sequential symbol, then [seq norm t] computes a
-    [norm] form of [t] so that each immediate subterm is also in [seq norm]
-    form. Otherwise, [seq norm t = norm t]. *)
-let rec seq norm t =
-  match get_args t with
-  | Symb s, _ when s.sym_mstrat = Sequen ->
-      begin
-        let t = norm t in
-        let h, ts = get_args t in
-        match h with
-        | Symb _ -> add_args_map h (seq norm) ts
-        | _ -> t
-      end
-  | _ -> norm t
+  | Symb f, [t1;t2] ->
+     begin match f.sym_prop with
+     | AC _ ->
+        (*incr ac;*)
+        if Logger.log_enabled () then log_whnf "AC<- (%a ++ %a)" term t1 term t2;
+        let r = comb_aliens (deep norm) f t1 t2 (*comb f norm (aliens f norm ts)*) in
+        if Logger.log_enabled () then log_whnf "AC-> (%a ++ %a) => %a" term t1 term t2 term r;
+        r
+     | Commu ->
+        let (c,t1,t2) = norm_cmp norm t1 t2 in
+        if c>0 then begin (* swap t1 and t2 *)
+            Stdlib.incr steps; app2 f t2 t1
+          end
+        else unfold t
+     | _ -> unfold t
+     end
+  | _ -> unfold t
 
 (** [whnf cfg t] computes a whnf of the term [t] wrt configuration [cfg]. *)
 let whnf : config -> term -> term = fun cfg ->
@@ -534,7 +690,7 @@ let whnf : config -> term -> term = fun cfg ->
   and whnf_stk : term -> stack -> term * stack = fun t stk ->
     if Logger.log_enabled () then
       log_whnf "%awhnf_stk %a %a" D.depth !depth term t (D.list term) stk;
-    let t = unfold t in
+    let t = unfold (ac whnf t) in
     match t with
     | Appl(f,u) -> whnf_stk f (to_tref u::stk)
     (*| _ ->
@@ -564,17 +720,13 @@ let whnf : config -> term -> term = fun cfg ->
             else (Stdlib.incr steps; whnf_stk u stk)
         | None when not cfg.rewrite -> t, stk
         | _ ->
-            let norm =
-              if Timed.(!(s.sym_rstrat)) = Innermost then
-                fun t -> new_ac (seq whnf t)
-              else whnf
-            in
-            match tree_walk norm (cfg.dtree s) stk with
-            | None -> t, stk
-            | Some (t, stk) ->
-                if Logger.log_enabled () then
-                  log_whnf "%aapply rewrite rule" D.depth !depth;
-                Stdlib.incr steps; whnf_stk t stk
+           begin match tree_walk whnf (cfg.dtree s) stk with
+           | None -> log_whnf "%ano rule applies" D.depth !depth; t, stk
+           | Some (t, rstk) ->
+              if Logger.log_enabled () then
+                log_whnf "%aapply rewrite rule (lhs stack %a)" D.depth !depth (D.list term) stk;
+              Stdlib.incr steps; whnf_stk t rstk
+           end
         end
     | Vari x ->
         begin match VarMap.find_opt x cfg.varmap with
@@ -582,71 +734,11 @@ let whnf : config -> term -> term = fun cfg ->
         | None -> t, stk
         end
     | _ -> t, stk
-(*
-  (* [snf t] computes snf of [t]. *)
-  and snf t =
-    let n = Stdlib.(!steps) in
-    let u, stk = snf_stk t [] in
-    if Stdlib.(!steps) <> n then add_args u stk else unfold t
-
-  (* [snf_stk t stk] computes a snf of [add_args t stk]. *)
-  and snf_stk : term -> stack -> term * stack = fun t stk ->
-    if Logger.log_enabled () then
-      log_whnf "%asnf_stk %a %a" D.depth !depth term t (D.list term) stk;
-    let t = unfold t in
-    match t with
-    | Appl(f,u) -> snf_stk f (to_tref u::stk)
-    (*| _ ->
-      if Logger.log_enabled() then
-      log_snf "%asnf_stk %a %a" D.depth !depth term t (D.list term) stk;
-      match t, stk with*)
-    | Abst(a,b) ->
-        begin
-          match stk with
-          | u::stk when cfg.beta -> Stdlib.incr steps; snf_stk (subst b u) stk
-          | _ -> Abst(snf a, binder snf b), List.map snf stk
-        end
-    | LLet(_,t,u) ->
-        (*FIXME? instead of doing a substitution now, add a local definition
-          instead to postpone the substitution when it will be necessary. But
-          the following makes tests/OK/725.lp fail: *)
-        (*let x,u = unbind u in
-          snf_stk {cfg with varmap = VarMap.add x t cfg.varmap} u stk*)
-        Stdlib.incr steps; snf_stk (subst u t) stk
-    | Symb s ->
-        begin match Timed.(!(s.sym_def)) with
-        (* The invariant that defined symbols are subject to no
-           rewriting rules is false during indexing for websearch;
-           that's the reason for the when in the next line *)
-        | Some u when Tree_type.is_empty (cfg.dtree s) ->
-            if Timed.(!(s.sym_opaq)) || not cfg.expand_defs then
-              t, List.map snf stk
-            else (Stdlib.incr steps; snf_stk u stk)
-        | None when not cfg.rewrite -> t, List.map snf stk
-        | _ ->
-            match tree_walk whnf (cfg.dtree s) stk with
-            | None -> t, List.map snf stk
-            | Some (t', stk') ->
-                if Logger.log_enabled () then
-                  log_snf "%aapply rewrite rule" D.depth !depth;
-                Stdlib.incr steps; snf_stk t' stk'
-        end
-    | Vari x ->
-        begin match VarMap.find_opt x cfg.varmap with
-        | Some v -> Stdlib.incr steps; snf_stk v stk
-        | None -> t, List.map snf stk
-        end
-    | Prod(a,b) -> Prod(snf a, binder snf b), stk
-    | Type -> t, stk
-    | Kind -> t, stk
-    | Plac _ -> t, stk (* may happen when reducing coercions *)
-    | Meta(m,ts) -> Meta(m,Array.map snf ts), List.map snf stk
-    | Patt(i,n,ts) -> Patt(i,n,Array.map snf ts), List.map snf stk
-    | Bvar _ -> assert false
-    | Wild -> assert false
-    | TRef _ -> assert false
- *)
-  in fun t -> ac whnf (seq whnf t)
+  in fun t ->
+     log_whnf "Start top whnf %a" term t;
+     let t' = whnf t in
+     log_whnf "End top whnf %a" term t';
+     t'
 
 (** {1 Define exposed functions}
     that take optional arguments rather than a config. *)
@@ -662,6 +754,7 @@ let time_reducer (f: reducer): reducer =
 let snf : ?dtree:(sym -> dtree) -> reducer = fun ?dtree ?tags c t ->
   Stdlib.(steps := 0);
   let u = snf (whnf (make ?dtree ?tags c)) t in
+  (*stat();*)
   if Stdlib.(!steps = 0) then unfold t else u
 
 let snf ?dtree = time_reducer (snf ?dtree)

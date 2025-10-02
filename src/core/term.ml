@@ -67,7 +67,10 @@ let eq_vars : var -> var -> bool = fun x y -> compare_vars x y = 0
 
 (** [new_var name] creates a new unique variable of name [name]. *)
 let new_var : string -> var =
-  let n = Stdlib.ref 0 in fun name -> incr n; !n, name
+  let n = Stdlib.ref 0 in
+  fun name ->
+  incr n; assert (!n>=0); (* Detecting int overflow *)
+  (!n, name)
 
 (** [new_var_ind s i] creates a new [var] of name [s ^ string_of_int i]. *)
 let new_var_ind : string -> int -> var = fun s i ->

@@ -366,11 +366,13 @@ val msubst : mbinder -> term array -> term
 
 (** [unbind b] substitutes the binder [b] by a fresh variable of name [name]
    if given, or the binder name otherwise. The variable and the result of the
-   substitution are returned. *)
+   substitution are returned.
+   The returned variable is greater than any variable occurring in [b] *)
 val unbind : ?name:string -> binder -> var * term
 
 (** [unbind2 f g] is similar to [unbind f], but it substitutes two binders [f]
-   and [g] at once using the same fresh variable. *)
+   and [g] at once using the same fresh variable.
+   The returned variable is greater than any variable occurring in [f] and [g] *)
 val unbind2 : ?name:string -> binder -> binder -> var * term * term
 
 (** [unmbind b] substitutes the multiple binder [b] with fresh variables. This
