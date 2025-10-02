@@ -40,7 +40,7 @@ let eta_equality : bool Timed.ref = Console.register_flag "eta_equality" false
 (** Counter used to preserve physical equality in {!val:whnf}. *)
 let steps : int Stdlib.ref = Stdlib.ref 0
 
-(*
+
 let counter, reset =
   let l = Stdlib.ref [] in
   (fun () ->
@@ -49,17 +49,17 @@ let counter, reset =
     r),
   (fun () -> List.iter (fun r -> r := 0) !l)
 
-let cut=true
 let ins = counter ()
 let perm = counter ()
 let ac = counter()
 
 let stat() =
-  out Stdlib.(!Error.err_fmt)
-  (*Printf.printf*) "ac: %d\tinsert: %d\tperm: %d\n" !ac !ins !perm; reset()
+(*  out Stdlib.(!Error.err_fmt)
+    "ac: %d\tinsert: %d\tperm: %d\n" !ac !ins !perm;*)
+  reset()
 
 let _ = at_exit stat
-*)
+
 (** {1 Simple term manipulations related to AC *)
 
 
@@ -588,7 +588,7 @@ let norm_cmp norm : term effect_comparison_function =
 (** {1 AC normaliaation} *)
 
 let insert norm ord t =
-  (*incr ins;*)
+  incr ins;
   let rec aux ts =
     match ts with
     | [] -> [t]
@@ -596,12 +596,17 @@ let insert norm ord t =
        let (c,t,t1) = norm t t1 in
        if ord c then
          (* If [t] is not inserted in head position, then commutativity (and assoc) is used *)
-         ((*incr perm;*) Stdlib.incr steps; t1::aux ts)
+         (incr perm; Stdlib.incr steps; t1::aux ts)
        else t::t1::ts in
   aux
 
 let left_insert norm t acc = insert (norm_cmp norm) (fun c -> c > 0) t acc
-let right_insert norm t racc = insert (norm_cmp norm) (fun c -> c < 0) t racc
+(*let right_insert norm t racc = insert (norm_cmp norm) (fun c -> c < 0) t racc*)
+
+let sort_aliens norm al =
+  List.fold_left
+    (fun sortd t -> left_insert norm t sortd)
+    [] (List.rev al)
 
 
 (* Determines whether [t] reduces to [f t1 t2] and call [ac], otherwise
@@ -622,38 +627,40 @@ let dest_ac norm f t ~ac ~nonac =
      | _ -> nonac t) 
 
 
-(* /!\ left aliens in reverse order
-   [acc] sorted in increasing order *)
-let rec left_comb_aliens norm f rlts t2 acc =
-  dest_ac norm f t2
-    ~ac:(fun t21 t22 ->
-      (* If [t2] is [f t21 t21] then we apply associativity *)
-      Stdlib.incr steps;
-      left_comb_aliens norm f (t21::rlts) t22 acc)
+(* /!\ right subterms [rts] (out spine) in regular order
+   [racc] aliens in rverse order *)
+let left_aliens norm f t1 t2 =
+  let rec proc out_spine t1 rts racc =
+    dest_ac norm f t1
+      ~ac:(fun t11 t12 ->
+        if out_spine then Stdlib.incr steps;
+        proc out_spine t11 (t12::rts) racc)
+      ~nonac:(fun t1' ->
+        let racc' = t1'::racc in
+        (match rts with
+          [] -> List.rev racc'
+        | t2::rts -> proc true t2 rts racc'))
+  in proc false t1 [t2] []
+
+(* /!\ left subterms [rlts] in reverse order
+   [acc] aliens in regular order *)
+let right_aliens norm f t1 t2 =
+  let rec proc out_spine rlts t2 acc =
+    dest_ac norm f t2
+      ~ac:(fun t21 t22 ->
+        if out_spine then Stdlib.incr steps;
+        proc out_spine (t21::rlts) t22 acc)
     ~nonac:(fun t2' ->
-      (* If [t2] (reduced to [t2']) is an alien we insert it in acc *)
-      let acc' = left_insert norm t2' acc in
+      let acc' = t2'::acc in
       (match rlts with
-        [] -> left_comb f acc'
-      | t1::rlts -> left_comb_aliens norm f rlts t1 acc'))
+        [] -> acc'
+      | t1::rlts -> proc true rlts t1 acc'))
+  in proc false [t1] t2 []
 
-(* /!\ right aliens in regular order
-   [acc] sorted in decreasing order *)
-let rec right_comb_aliens norm f t1 rts racc =
-  dest_ac norm f t1
-    ~ac:(fun t11 t12 ->
-      Stdlib.incr steps;
-      right_comb_aliens norm f t11 (t12::rts) racc)
-    ~nonac:(fun t1' ->
-      let racc' = right_insert norm t1' racc in
-      (match rts with
-        [] -> right_comb f (List.rev racc')
-      | t2::rts -> right_comb_aliens norm f t2 rts racc'))
-
-let comb_aliens norm f t1 t2 =
+let aliens norm f t1 t2 =
   match f.sym_prop with
-  | AC Left -> left_comb_aliens norm f [t1] t2 []
-  | AC Right -> right_comb_aliens norm f t1 [t2] []
+  | AC Left -> left_aliens norm f t1 t2
+  | AC Right -> right_aliens norm f t1 t2
   | _ -> assert false
 
 
@@ -663,20 +670,22 @@ let ac norm t =
   | Symb f, [t1;t2] ->
      begin match f.sym_prop with
      | AC _ ->
-        (*incr ac;*)
+        incr ac;
         if Logger.log_enabled () then log_whnf "AC<- (%a ++ %a)" term t1 term t2;
-        let r = comb_aliens (deep norm) f t1 t2 (*comb f norm (aliens f norm ts)*) in
-        if Logger.log_enabled () then log_whnf "AC-> (%a ++ %a) => %a" term t1 term t2 term r;
-        r
+        let al = aliens norm f t1 t2 in
+        if Logger.log_enabled () then log_whnf "AC aliens: (%a ++ %a) = %a" term t1 term t2 (D.list term) al;
+        let al = sort_aliens norm al in
+        if Logger.log_enabled () then log_whnf "AC-> (%a ++ %a) => %a" term t1 term t2 (D.list term) al;
+        comb f al
      | Commu ->
         let (c,t1,t2) = norm_cmp norm t1 t2 in
         if c>0 then begin (* swap t1 and t2 *)
             Stdlib.incr steps; app2 f t2 t1
           end
-        else unfold t
-     | _ -> unfold t
+        else t
+     | _ -> t
      end
-  | _ -> unfold t
+  | _ -> t
 
 (** [whnf cfg t] computes a whnf of the term [t] wrt configuration [cfg]. *)
 let whnf : config -> term -> term = fun cfg ->
@@ -690,7 +699,7 @@ let whnf : config -> term -> term = fun cfg ->
   and whnf_stk : term -> stack -> term * stack = fun t stk ->
     if Logger.log_enabled () then
       log_whnf "%awhnf_stk %a %a" D.depth !depth term t (D.list term) stk;
-    let t = unfold (ac whnf t) in
+    let t = unfold (ac (deep whnf) t) in
     match t with
     | Appl(f,u) -> whnf_stk f (to_tref u::stk)
     (*| _ ->
@@ -754,7 +763,7 @@ let time_reducer (f: reducer): reducer =
 let snf : ?dtree:(sym -> dtree) -> reducer = fun ?dtree ?tags c t ->
   Stdlib.(steps := 0);
   let u = snf (whnf (make ?dtree ?tags c)) t in
-  (*stat();*)
+  stat();
   if Stdlib.(!steps = 0) then unfold t else u
 
 let snf ?dtree = time_reducer (snf ?dtree)
