@@ -301,8 +301,6 @@ let read =
    pairs. *)
 let add_rule : t -> sym_rule -> unit = fun sign (sym,r) ->
   sym.sym_rules := !(sym.sym_rules) @ [r];
-  if Timed.(!(sym.sym_rstrat)) <> Innermost && LibTerm.contains_ac_sym [r]
-  then Timed.(sym.sym_rstrat := Innermost);
   if sym.sym_path <> sign.sign_path then (* update dependencies *)
     begin
       let sm = Path.Map.find sym.sym_path !(sign.sign_deps) in
@@ -320,8 +318,6 @@ let add_rule : t -> sym_rule -> unit = fun sign (sym,r) ->
    critical pairs. *)
 let add_rules : t -> sym -> rule list -> unit = fun sign sym rs ->
   sym.sym_rules := !(sym.sym_rules) @ rs;
-  if Timed.(!(sym.sym_rstrat)) <> Innermost && LibTerm.contains_ac_sym rs
-  then Timed.(sym.sym_rstrat := Innermost);
   if sym.sym_path <> sign.sign_path then (* update dependencies *)
     begin
       let sm = Path.Map.find sym.sym_path !(sign.sign_deps) in

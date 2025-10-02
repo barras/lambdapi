@@ -648,7 +648,7 @@ let rec right_comb_aliens norm f t1 rts racc =
       let racc' = right_insert norm t1' racc in
       (match rts with
         [] -> right_comb f (List.rev racc')
-      | t2::rrts -> right_comb_aliens norm f t2 rts racc'))
+      | t2::rts -> right_comb_aliens norm f t2 rts racc'))
 
 let comb_aliens norm f t1 t2 =
   match f.sym_prop with
