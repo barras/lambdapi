@@ -54,8 +54,8 @@ let perm = counter ()
 let ac = counter()
 
 let stat() =
-(*  out Stdlib.(!Error.err_fmt)
-    "ac: %d\tinsert: %d\tperm: %d\n" !ac !ins !perm;*)
+  out Stdlib.(!Error.err_fmt)
+    "ac: %d\tinsert: %d\tperm: %d\n" !ac !ins !perm;
   reset()
 
 let _ = at_exit stat
@@ -232,6 +232,7 @@ let make : ?dtree:(sym -> dtree) -> ?tags:rw_tag list -> ctxt -> config =
 
 (** Abstract machine stack. *)
 type stack = term list
+(*type ac_stack = (sym option * term) list*)
 
 (** [to_tref t] transforms {!constructor:Appl} into
    {!constructor:TRef}. *)
@@ -247,13 +248,23 @@ let depth = Stdlib.ref 0
 let deep f x = incr depth; let v = f x in decr depth; v
 let incr_depth f = incr depth; let v = f() in decr depth; v
 
+let _sym_aco f =
+  match f.sym_prop with
+  | AC _ -> Some f
+  | _ -> None
+
+let is_sym_aco f aco =
+  match aco with
+  | Some g when f==g -> true
+  | _ -> false
+
 (** [tree_walk norm dt stk] tries to apply a rewrite rule by matching the
     stack [stk] against the decision tree [dt], possibly reducing stack
     elements with [norm]. The resulting state of the abstract machine is
     returned in case of success. Even if matching fails, the stack [stk] may
     be imperatively updated since a reduction step taken in elements of the
     stack is preserved (this is done using {!constructor:Term.term.TRef}). *)
-let tree_walk : (term -> term) -> dtree -> stack -> (term * stack) option =
+let tree_walk : (sym option -> term -> term) -> dtree -> stack -> (term * stack) option =
   fun norm tree stk ->
   if Logger.log_enabled () then
     log_whnf "%atree_walk %a" D.depth !depth (D.list term) stk;
@@ -294,7 +305,7 @@ let tree_walk : (term -> term) -> dtree -> stack -> (term * stack) option =
         let next =
           match cond with
           | CondNL(i, j) ->
-              if incr_depth (fun () -> (*log_whnf"start NL";*)let r=eq_modulo norm vars.(i) vars.(j) in (*log_whnf"end NL";*) r)
+              if incr_depth (fun () -> (*log_whnf"start NL";*)let r=eq_modulo (norm None) vars.(i) vars.(j) in (*log_whnf"end NL";*) r)
               then ok else fail
           | CondFV(i,xs) ->
               let allowed =
@@ -318,7 +329,7 @@ let tree_walk : (term -> term) -> dtree -> stack -> (term * stack) option =
               if no_forbidden b
               then (bound.(i) <- Some b; ok) else
               (* As a last resort we try matching the SNF. *)
-              let b = bind_mvar allowed (snf norm vars.(i)) in
+              let b = bind_mvar allowed (snf (norm None) vars.(i)) in
               if no_forbidden b
               then (bound.(i) <- Some b; ok)
               else fail
@@ -346,7 +357,7 @@ let tree_walk : (term -> term) -> dtree -> stack -> (term * stack) option =
         else
           let s = Stdlib.(!steps) in
 (*          let _ = log_whnf "Node start reduce" in*)
-          let (t, args) = incr_depth (fun () -> get_args (norm examined)) in
+          let (t, args) = incr_depth (fun () -> get_args (norm None examined)) in
 (*          let _ = log_whnf "Node end reduce" in*)
           let args = if store then List.map to_tref args else args in
           (* If some reduction has been performed by [norm] ([steps <>
@@ -587,6 +598,38 @@ let norm_cmp norm : term effect_comparison_function =
 
 (** {1 AC normaliaation} *)
 
+(*
+let merge norm ord al bl acc =
+  match al,bl with
+  | [], _ -> List.rev_append acc bl
+  | _, [] -> List.rev_append acc al
+  | a::al, b::bl ->
+     let (c,a',b') = norm a b in
+     if ord c then merge norm ord (a'::al) bl (b'::acc)
+     else merge norm ord al (b'::bl) (a'::norm)
+
+let rec merge_step norm ord ll acc =
+  match ll with
+  | [] -> acc
+  | [l] -> l::acc
+  | l1::l2::ll -> merge_step norm ord ll (merge l1 l2::acc)
+
+let rec merge norm ord ll =
+  match ll with 
+  | [] -> []
+  | [l] -> l
+  | _ -> merge norm ord (merge_step norm ord ll)
+
+
+let rec unsorted_elts norm ord revsrt l unsrt =
+  match l, revsrt with
+  | [],_ -> List.rev srt, unsrt
+  | y::l, x::revsrt ->
+     let c,x',y' = norm x y in
+     if ord c then (* y > x *) unsorted_elts norm ord 
+     else unsorted_elts norm ord (y'::revsrt
+ *)
+
 let insert norm ord t =
   incr ins;
   let rec aux ts =
@@ -600,12 +643,9 @@ let insert norm ord t =
        else t::t1::ts in
   aux
 
-let left_insert norm t acc = insert (norm_cmp norm) (fun c -> c > 0) t acc
-(*let right_insert norm t racc = insert (norm_cmp norm) (fun c -> c < 0) t racc*)
-
 let sort_aliens norm al =
   List.fold_left
-    (fun sortd t -> left_insert norm t sortd)
+    (fun sortd t -> insert (norm_cmp norm) (fun c -> c>0) t sortd)
     [] (List.rev al)
 
 
@@ -618,9 +658,9 @@ let sort_aliens norm al =
    This would be even better, e.g. for f(t1,a) when a reduces to f(t2,t3)
    we could avoid sorting [t2;t3], then [t1;t2;t3] *)
 let dest_ac norm f t ~ac ~nonac =
-  match get_args t with
+(*  match get_args t with
   | Symb g, [t1;t2] when f==g -> ac t1 t2
-  | _ -> 
+  | _ ->*)
      let t = norm t in
      (match get_args t with
      | Symb g, [t1;t2] when f==g -> ac t1 t2
@@ -665,20 +705,21 @@ let aliens norm f t1 t2 =
 
 
 (** [ac norm t] computes a head-AC [norm] form. *)
-let ac norm t =
-  match get_args t with
-  | Symb f, [t1;t2] ->
+let ac aco norm t =
+  match get_args t, aco with
+  | (Symb f, [_;_]), Some g when f==g -> t
+  | (Symb f, [t1;t2]), _ ->
      begin match f.sym_prop with
      | AC _ ->
         incr ac;
-        if Logger.log_enabled () then log_whnf "AC<- (%a ++ %a)" term t1 term t2;
-        let al = aliens norm f t1 t2 in
-        if Logger.log_enabled () then log_whnf "AC aliens: (%a ++ %a) = %a" term t1 term t2 (D.list term) al;
-        let al = sort_aliens norm al in
-        if Logger.log_enabled () then log_whnf "AC-> (%a ++ %a) => %a" term t1 term t2 (D.list term) al;
+        if Logger.log_enabled () then log_whnf "AC<- %a" term (app2 f t1 t2);
+        let al = aliens (norm (Some f)) f t1 t2 in
+        if Logger.log_enabled () then log_whnf "AC aliens: %a = %a" term (app2 f t1 t2) (D.list term) al;
+        let al = sort_aliens (norm None) al in
+        if Logger.log_enabled () then log_whnf "AC-> %a => %a" term (app2 f t1 t2) (D.list term) al;
         comb f al
      | Commu ->
-        let (c,t1,t2) = norm_cmp norm t1 t2 in
+        let (c,t1,t2) = norm_cmp (norm None) (norm None t1) (norm None t2) in
         if c>0 then begin (* swap t1 and t2 *)
             Stdlib.incr steps; app2 f t2 t1
           end
@@ -690,18 +731,18 @@ let ac norm t =
 (** [whnf cfg t] computes a whnf of the term [t] wrt configuration [cfg]. *)
 let whnf : config -> term -> term = fun cfg ->
   (* [whnf t] computes a whnf of [t]. *)
-  let rec whnf t =
+  let rec whnf aco t =
     let n = Stdlib.(!steps) in
-    let u, stk = whnf_stk t [] in
+    let u, stk = whnf_stk aco t [] in
     if Stdlib.(!steps) <> n then add_args u stk else unfold t
 
   (* [whnf_stk t stk] computes a whnf of [add_args t stk]. *)
-  and whnf_stk : term -> stack -> term * stack = fun t stk ->
+  and whnf_stk : sym option -> term -> stack -> term * stack = fun aco t stk ->
     if Logger.log_enabled () then
-      log_whnf "%awhnf_stk %a %a" D.depth !depth term t (D.list term) stk;
-    let t = unfold (ac (deep whnf) t) in
+      log_whnf "%awhnf_stk %a %a %a" (D.option sym) aco D.depth !depth term t (D.list term) stk;
+    let t = unfold (ac aco (deep whnf) t) in
     match t with
-    | Appl(f,u) -> whnf_stk f (to_tref u::stk)
+    | Appl(f,u) -> whnf_stk aco f (to_tref u::stk)
     (*| _ ->
       if Logger.log_enabled() then
       log_whnf "%awhnf_stk %a %a" D.depth !depth term t (D.list term) stk;
@@ -709,7 +750,7 @@ let whnf : config -> term -> term = fun cfg ->
     | Abst(_,f) ->
         begin
           match stk with
-          | u::stk -> Stdlib.incr steps; whnf_stk (subst f u) stk
+          | u::stk -> Stdlib.incr steps; whnf_stk aco (subst f u) stk
           | _ -> t, stk
         end
     | LLet(_,t,u) ->
@@ -718,7 +759,8 @@ let whnf : config -> term -> term = fun cfg ->
           the following makes tests/OK/725.lp fail: *)
         (*let x,u = unbind u in
           whnf_stk {cfg with varmap = VarMap.add x t cfg.varmap} u stk*)
-        Stdlib.incr steps; whnf_stk (subst u t) stk
+        Stdlib.incr steps; whnf_stk aco (subst u t) stk
+    | Symb f when is_sym_aco f aco -> t, stk
     | Symb s ->
         begin match Timed.(!(s.sym_def)) with
         (* The invariant that defined symbols are subject to no
@@ -726,7 +768,7 @@ let whnf : config -> term -> term = fun cfg ->
            that's the reason for the when in the next line *)
         | Some u when Tree_type.is_empty (cfg.dtree s) ->
             if Timed.(!(s.sym_opaq)) || not cfg.expand_defs then t, stk
-            else (Stdlib.incr steps; whnf_stk u stk)
+            else (Stdlib.incr steps; whnf_stk aco u stk)
         | None when not cfg.rewrite -> t, stk
         | _ ->
            begin match tree_walk whnf (cfg.dtree s) stk with
@@ -734,18 +776,18 @@ let whnf : config -> term -> term = fun cfg ->
            | Some (t, rstk) ->
               if Logger.log_enabled () then
                 log_whnf "%aapply rewrite rule (lhs stack %a)" D.depth !depth (D.list term) stk;
-              Stdlib.incr steps; whnf_stk t rstk
+              Stdlib.incr steps; whnf_stk aco t rstk
            end
         end
     | Vari x ->
         begin match VarMap.find_opt x cfg.varmap with
-        | Some v -> Stdlib.incr steps; whnf_stk v stk
+        | Some v -> Stdlib.incr steps; whnf_stk aco v stk
         | None -> t, stk
         end
     | _ -> t, stk
   in fun t ->
      log_whnf "Start top whnf %a" term t;
-     let t' = whnf t in
+     let t' = whnf None t in
      log_whnf "End top whnf %a" term t';
      t'
 
@@ -854,7 +896,7 @@ let unfold_sym : sym -> term -> term =
   | [] -> fun t -> t
   | _ ->
       let unfold_sym_app args =
-        match tree_walk (whnf []) Timed.(!(s.sym_dtree)) args with
+        match tree_walk (fun _ -> whnf []) Timed.(!(s.sym_dtree)) args with
         | Some(r,ts) -> add_args r ts
         | None -> add_args (Symb s) args
       in unfold_sym s unfold_sym_app

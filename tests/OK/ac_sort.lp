@@ -1,567 +1,630 @@
-require open tests.OK.lia;
-require open tests.OK.Set;
 require open tests.OK.Z;
 
-symbol T000: τ int;
-symbol T001: τ int;
-symbol T002: τ int;
-symbol T003: τ int;
-symbol T004: τ int;
-symbol T005: τ int;
-symbol T006: τ int;
-symbol T007: τ int;
-symbol T008: τ int;
-symbol T009: τ int;
+constant symbol R : TYPE;
+symbol var : ℤ → R;
+right associative commutative symbol add:R → R → R;
 
-symbol T010: τ int;
-symbol T011: τ int;
-symbol T012: τ int;
-symbol T013: τ int;
-symbol T014: τ int;
-symbol T015: τ int;
-symbol T016: τ int;
-symbol T017: τ int;
-symbol T018: τ int;
-symbol T019: τ int;
+sequential symbol ⇧ : ℤ → R;
 
-symbol T020: τ int;
-symbol T021: τ int;
-symbol T022: τ int;
-symbol T023: τ int;
-symbol T024: τ int;
-symbol T025: τ int;
-symbol T026: τ int;
-symbol T027: τ int;
-symbol T028: τ int;
-symbol T029: τ int;
+rule ⇧ ($x + $y) ↪ add (⇧ $x) (⇧ $y)
+with ⇧ $x ↪ var $x; // must be the last rule for ⇧
 
-symbol T030: τ int;
-symbol T031: τ int;
-symbol T032: τ int;
-symbol T033: τ int;
-symbol T034: τ int;
-symbol T035: τ int;
-symbol T036: τ int;
-symbol T037: τ int;
-symbol T038: τ int;
-symbol T039: τ int;
+symbol T000:ℤ;
+symbol T001:ℤ;
+symbol T002:ℤ;
+symbol T003:ℤ;
+symbol T004:ℤ;
+symbol T005:ℤ;
+symbol T006:ℤ;
+symbol T007:ℤ;
+symbol T008:ℤ;
+symbol T009:ℤ;
 
-symbol T040: τ int;
-symbol T041: τ int;
-symbol T042: τ int;
-symbol T043: τ int;
-symbol T044: τ int;
-symbol T045: τ int;
-symbol T046: τ int;
-symbol T047: τ int;
-symbol T048: τ int;
-symbol T049: τ int;
+symbol T010:ℤ;
+symbol T011:ℤ;
+symbol T012:ℤ;
+symbol T013:ℤ;
+symbol T014:ℤ;
+symbol T015:ℤ;
+symbol T016:ℤ;
+symbol T017:ℤ;
+symbol T018:ℤ;
+symbol T019:ℤ;
 
-symbol T050: τ int;
-symbol T051: τ int;
-symbol T052: τ int;
-symbol T053: τ int;
-symbol T054: τ int;
-symbol T055: τ int;
-symbol T056: τ int;
-symbol T057: τ int;
-symbol T058: τ int;
-symbol T059: τ int;
+symbol T020:ℤ;
+symbol T021:ℤ;
+symbol T022:ℤ;
+symbol T023:ℤ;
+symbol T024:ℤ;
+symbol T025:ℤ;
+symbol T026:ℤ;
+symbol T027:ℤ;
+symbol T028:ℤ;
+symbol T029:ℤ;
 
-symbol T060: τ int;
-symbol T061: τ int;
-symbol T062: τ int;
-symbol T063: τ int;
-symbol T064: τ int;
-symbol T065: τ int;
-symbol T066: τ int;
-symbol T067: τ int;
-symbol T068: τ int;
-symbol T069: τ int;
+symbol T030:ℤ;
+symbol T031:ℤ;
+symbol T032:ℤ;
+symbol T033:ℤ;
+symbol T034:ℤ;
+symbol T035:ℤ;
+symbol T036:ℤ;
+symbol T037:ℤ;
+symbol T038:ℤ;
+symbol T039:ℤ;
 
-symbol T070: τ int;
-symbol T071: τ int;
-symbol T072: τ int;
-symbol T073: τ int;
-symbol T074: τ int;
-symbol T075: τ int;
-symbol T076: τ int;
-symbol T077: τ int;
-symbol T078: τ int;
-symbol T079: τ int;
+symbol T040:ℤ;
+symbol T041:ℤ;
+symbol T042:ℤ;
+symbol T043:ℤ;
+symbol T044:ℤ;
+symbol T045:ℤ;
+symbol T046:ℤ;
+symbol T047:ℤ;
+symbol T048:ℤ;
+symbol T049:ℤ;
 
-symbol T080: τ int;
-symbol T081: τ int;
-symbol T082: τ int;
-symbol T083: τ int;
-symbol T084: τ int;
-symbol T085: τ int;
-symbol T086: τ int;
-symbol T087: τ int;
-symbol T088: τ int;
-symbol T089: τ int;
+symbol T050:ℤ;
+symbol T051:ℤ;
+symbol T052:ℤ;
+symbol T053:ℤ;
+symbol T054:ℤ;
+symbol T055:ℤ;
+symbol T056:ℤ;
+symbol T057:ℤ;
+symbol T058:ℤ;
+symbol T059:ℤ;
 
-symbol T090: τ int;
-symbol T091: τ int;
-symbol T092: τ int;
-symbol T093: τ int;
-symbol T094: τ int;
-symbol T095: τ int;
-symbol T096: τ int;
-symbol T097: τ int;
-symbol T098: τ int;
-symbol T099: τ int;
+symbol T060:ℤ;
+symbol T061:ℤ;
+symbol T062:ℤ;
+symbol T063:ℤ;
+symbol T064:ℤ;
+symbol T065:ℤ;
+symbol T066:ℤ;
+symbol T067:ℤ;
+symbol T068:ℤ;
+symbol T069:ℤ;
+
+symbol T070:ℤ;
+symbol T071:ℤ;
+symbol T072:ℤ;
+symbol T073:ℤ;
+symbol T074:ℤ;
+symbol T075:ℤ;
+symbol T076:ℤ;
+symbol T077:ℤ;
+symbol T078:ℤ;
+symbol T079:ℤ;
+
+symbol T080:ℤ;
+symbol T081:ℤ;
+symbol T082:ℤ;
+symbol T083:ℤ;
+symbol T084:ℤ;
+symbol T085:ℤ;
+symbol T086:ℤ;
+symbol T087:ℤ;
+symbol T088:ℤ;
+symbol T089:ℤ;
+
+symbol T090:ℤ;
+symbol T091:ℤ;
+symbol T092:ℤ;
+symbol T093:ℤ;
+symbol T094:ℤ;
+symbol T095:ℤ;
+symbol T096:ℤ;
+symbol T097:ℤ;
+symbol T098:ℤ;
+symbol T099:ℤ;
 
 // 100
-symbol T100: τ int;
-symbol T101: τ int;
-symbol T102: τ int;
-symbol T103: τ int;
-symbol T104: τ int;
-symbol T105: τ int;
-symbol T106: τ int;
-symbol T107: τ int;
-symbol T108: τ int;
-symbol T109: τ int;
+symbol T100:ℤ;
+symbol T101:ℤ;
+symbol T102:ℤ;
+symbol T103:ℤ;
+symbol T104:ℤ;
+symbol T105:ℤ;
+symbol T106:ℤ;
+symbol T107:ℤ;
+symbol T108:ℤ;
+symbol T109:ℤ;
 
-symbol T110: τ int;
-symbol T111: τ int;
-symbol T112: τ int;
-symbol T113: τ int;
-symbol T114: τ int;
-symbol T115: τ int;
-symbol T116: τ int;
-symbol T117: τ int;
-symbol T118: τ int;
-symbol T119: τ int;
+symbol T110:ℤ;
+symbol T111:ℤ;
+symbol T112:ℤ;
+symbol T113:ℤ;
+symbol T114:ℤ;
+symbol T115:ℤ;
+symbol T116:ℤ;
+symbol T117:ℤ;
+symbol T118:ℤ;
+symbol T119:ℤ;
 
-symbol T120: τ int;
-symbol T121: τ int;
-symbol T122: τ int;
-symbol T123: τ int;
-symbol T124: τ int;
-symbol T125: τ int;
-symbol T126: τ int;
-symbol T127: τ int;
-symbol T128: τ int;
-symbol T129: τ int;
+symbol T120:ℤ;
+symbol T121:ℤ;
+symbol T122:ℤ;
+symbol T123:ℤ;
+symbol T124:ℤ;
+symbol T125:ℤ;
+symbol T126:ℤ;
+symbol T127:ℤ;
+symbol T128:ℤ;
+symbol T129:ℤ;
 
-symbol T130: τ int;
-symbol T131: τ int;
-symbol T132: τ int;
-symbol T133: τ int;
-symbol T134: τ int;
-symbol T135: τ int;
-symbol T136: τ int;
-symbol T137: τ int;
-symbol T138: τ int;
-symbol T139: τ int;
+symbol T130:ℤ;
+symbol T131:ℤ;
+symbol T132:ℤ;
+symbol T133:ℤ;
+symbol T134:ℤ;
+symbol T135:ℤ;
+symbol T136:ℤ;
+symbol T137:ℤ;
+symbol T138:ℤ;
+symbol T139:ℤ;
 
-symbol T140: τ int;
-symbol T141: τ int;
-symbol T142: τ int;
-symbol T143: τ int;
-symbol T144: τ int;
-symbol T145: τ int;
-symbol T146: τ int;
-symbol T147: τ int;
-symbol T148: τ int;
-symbol T149: τ int;
+symbol T140:ℤ;
+symbol T141:ℤ;
+symbol T142:ℤ;
+symbol T143:ℤ;
+symbol T144:ℤ;
+symbol T145:ℤ;
+symbol T146:ℤ;
+symbol T147:ℤ;
+symbol T148:ℤ;
+symbol T149:ℤ;
 
-symbol T150: τ int;
-symbol T151: τ int;
-symbol T152: τ int;
-symbol T153: τ int;
-symbol T154: τ int;
-symbol T155: τ int;
-symbol T156: τ int;
-symbol T157: τ int;
-symbol T158: τ int;
-symbol T159: τ int;
+symbol T150:ℤ;
+symbol T151:ℤ;
+symbol T152:ℤ;
+symbol T153:ℤ;
+symbol T154:ℤ;
+symbol T155:ℤ;
+symbol T156:ℤ;
+symbol T157:ℤ;
+symbol T158:ℤ;
+symbol T159:ℤ;
 
-symbol T160: τ int;
-symbol T161: τ int;
-symbol T162: τ int;
-symbol T163: τ int;
-symbol T164: τ int;
-symbol T165: τ int;
-symbol T166: τ int;
-symbol T167: τ int;
-symbol T168: τ int;
-symbol T169: τ int;
+symbol T160:ℤ;
+symbol T161:ℤ;
+symbol T162:ℤ;
+symbol T163:ℤ;
+symbol T164:ℤ;
+symbol T165:ℤ;
+symbol T166:ℤ;
+symbol T167:ℤ;
+symbol T168:ℤ;
+symbol T169:ℤ;
 
-symbol T170: τ int;
-symbol T171: τ int;
-symbol T172: τ int;
-symbol T173: τ int;
-symbol T174: τ int;
-symbol T175: τ int;
-symbol T176: τ int;
-symbol T177: τ int;
-symbol T178: τ int;
-symbol T179: τ int;
+symbol T170:ℤ;
+symbol T171:ℤ;
+symbol T172:ℤ;
+symbol T173:ℤ;
+symbol T174:ℤ;
+symbol T175:ℤ;
+symbol T176:ℤ;
+symbol T177:ℤ;
+symbol T178:ℤ;
+symbol T179:ℤ;
 
-symbol T180: τ int;
-symbol T181: τ int;
-symbol T182: τ int;
-symbol T183: τ int;
-symbol T184: τ int;
-symbol T185: τ int;
-symbol T186: τ int;
-symbol T187: τ int;
-symbol T188: τ int;
-symbol T189: τ int;
+symbol T180:ℤ;
+symbol T181:ℤ;
+symbol T182:ℤ;
+symbol T183:ℤ;
+symbol T184:ℤ;
+symbol T185:ℤ;
+symbol T186:ℤ;
+symbol T187:ℤ;
+symbol T188:ℤ;
+symbol T189:ℤ;
 
-symbol T190: τ int;
-symbol T191: τ int;
-symbol T192: τ int;
-symbol T193: τ int;
-symbol T194: τ int;
-symbol T195: τ int;
-symbol T196: τ int;
-symbol T197: τ int;
-symbol T198: τ int;
-symbol T199: τ int;
+symbol T190:ℤ;
+symbol T191:ℤ;
+symbol T192:ℤ;
+symbol T193:ℤ;
+symbol T194:ℤ;
+symbol T195:ℤ;
+symbol T196:ℤ;
+symbol T197:ℤ;
+symbol T198:ℤ;
+symbol T199:ℤ;
 
 // 200
 
-symbol T200: τ int;
-symbol T201: τ int;
-symbol T202: τ int;
-symbol T203: τ int;
-symbol T204: τ int;
-symbol T205: τ int;
-symbol T206: τ int;
-symbol T207: τ int;
-symbol T208: τ int;
-symbol T209: τ int;
+symbol T200:ℤ;
+symbol T201:ℤ;
+symbol T202:ℤ;
+symbol T203:ℤ;
+symbol T204:ℤ;
+symbol T205:ℤ;
+symbol T206:ℤ;
+symbol T207:ℤ;
+symbol T208:ℤ;
+symbol T209:ℤ;
 
-symbol T210: τ int;
-symbol T211: τ int;
-symbol T212: τ int;
-symbol T213: τ int;
-symbol T214: τ int;
-symbol T215: τ int;
-symbol T216: τ int;
-symbol T217: τ int;
-symbol T218: τ int;
-symbol T219: τ int;
+symbol T210:ℤ;
+symbol T211:ℤ;
+symbol T212:ℤ;
+symbol T213:ℤ;
+symbol T214:ℤ;
+symbol T215:ℤ;
+symbol T216:ℤ;
+symbol T217:ℤ;
+symbol T218:ℤ;
+symbol T219:ℤ;
 
-symbol T220: τ int;
-symbol T221: τ int;
-symbol T222: τ int;
-symbol T223: τ int;
-symbol T224: τ int;
-symbol T225: τ int;
-symbol T226: τ int;
-symbol T227: τ int;
-symbol T228: τ int;
-symbol T229: τ int;
+symbol T220:ℤ;
+symbol T221:ℤ;
+symbol T222:ℤ;
+symbol T223:ℤ;
+symbol T224:ℤ;
+symbol T225:ℤ;
+symbol T226:ℤ;
+symbol T227:ℤ;
+symbol T228:ℤ;
+symbol T229:ℤ;
 
-symbol T230: τ int;
-symbol T231: τ int;
-symbol T232: τ int;
-symbol T233: τ int;
-symbol T234: τ int;
-symbol T235: τ int;
-symbol T236: τ int;
-symbol T237: τ int;
-symbol T238: τ int;
-symbol T239: τ int;
+symbol T230:ℤ;
+symbol T231:ℤ;
+symbol T232:ℤ;
+symbol T233:ℤ;
+symbol T234:ℤ;
+symbol T235:ℤ;
+symbol T236:ℤ;
+symbol T237:ℤ;
+symbol T238:ℤ;
+symbol T239:ℤ;
 
-symbol T240: τ int;
-symbol T241: τ int;
-symbol T242: τ int;
-symbol T243: τ int;
-symbol T244: τ int;
-symbol T245: τ int;
-symbol T246: τ int;
-symbol T247: τ int;
-symbol T248: τ int;
-symbol T249: τ int;
+symbol T240:ℤ;
+symbol T241:ℤ;
+symbol T242:ℤ;
+symbol T243:ℤ;
+symbol T244:ℤ;
+symbol T245:ℤ;
+symbol T246:ℤ;
+symbol T247:ℤ;
+symbol T248:ℤ;
+symbol T249:ℤ;
 
-symbol T250: τ int;
-symbol T251: τ int;
-symbol T252: τ int;
-symbol T253: τ int;
-symbol T254: τ int;
-symbol T255: τ int;
-symbol T256: τ int;
-symbol T257: τ int;
-symbol T258: τ int;
-symbol T259: τ int;
+symbol T250:ℤ;
+symbol T251:ℤ;
+symbol T252:ℤ;
+symbol T253:ℤ;
+symbol T254:ℤ;
+symbol T255:ℤ;
+symbol T256:ℤ;
+symbol T257:ℤ;
+symbol T258:ℤ;
+symbol T259:ℤ;
 
-symbol T260: τ int;
-symbol T261: τ int;
-symbol T262: τ int;
-symbol T263: τ int;
-symbol T264: τ int;
-symbol T265: τ int;
-symbol T266: τ int;
-symbol T267: τ int;
-symbol T268: τ int;
-symbol T269: τ int;
+symbol T260:ℤ;
+symbol T261:ℤ;
+symbol T262:ℤ;
+symbol T263:ℤ;
+symbol T264:ℤ;
+symbol T265:ℤ;
+symbol T266:ℤ;
+symbol T267:ℤ;
+symbol T268:ℤ;
+symbol T269:ℤ;
 
-symbol T270: τ int;
-symbol T271: τ int;
-symbol T272: τ int;
-symbol T273: τ int;
-symbol T274: τ int;
-symbol T275: τ int;
-symbol T276: τ int;
-symbol T277: τ int;
-symbol T278: τ int;
-symbol T279: τ int;
+symbol T270:ℤ;
+symbol T271:ℤ;
+symbol T272:ℤ;
+symbol T273:ℤ;
+symbol T274:ℤ;
+symbol T275:ℤ;
+symbol T276:ℤ;
+symbol T277:ℤ;
+symbol T278:ℤ;
+symbol T279:ℤ;
 
-symbol T280: τ int;
-symbol T281: τ int;
-symbol T282: τ int;
-symbol T283: τ int;
-symbol T284: τ int;
-symbol T285: τ int;
-symbol T286: τ int;
-symbol T287: τ int;
-symbol T288: τ int;
-symbol T289: τ int;
+symbol T280:ℤ;
+symbol T281:ℤ;
+symbol T282:ℤ;
+symbol T283:ℤ;
+symbol T284:ℤ;
+symbol T285:ℤ;
+symbol T286:ℤ;
+symbol T287:ℤ;
+symbol T288:ℤ;
+symbol T289:ℤ;
 
-symbol T290: τ int;
-symbol T291: τ int;
-symbol T292: τ int;
-symbol T293: τ int;
-symbol T294: τ int;
-symbol T295: τ int;
-symbol T296: τ int;
-symbol T297: τ int;
-symbol T298: τ int;
-symbol T299: τ int;
+symbol T290:ℤ;
+symbol T291:ℤ;
+symbol T292:ℤ;
+symbol T293:ℤ;
+symbol T294:ℤ;
+symbol T295:ℤ;
+symbol T296:ℤ;
+symbol T297:ℤ;
+symbol T298:ℤ;
+symbol T299:ℤ;
 
 // 300
 
-symbol T300: τ int;
-symbol T301: τ int;
-symbol T302: τ int;
-symbol T303: τ int;
-symbol T304: τ int;
-symbol T305: τ int;
-symbol T306: τ int;
-symbol T307: τ int;
-symbol T308: τ int;
-symbol T309: τ int;
+symbol T300:ℤ;
+symbol T301:ℤ;
+symbol T302:ℤ;
+symbol T303:ℤ;
+symbol T304:ℤ;
+symbol T305:ℤ;
+symbol T306:ℤ;
+symbol T307:ℤ;
+symbol T308:ℤ;
+symbol T309:ℤ;
 
-symbol T310: τ int;
-symbol T311: τ int;
-symbol T312: τ int;
-symbol T313: τ int;
-symbol T314: τ int;
-symbol T315: τ int;
-symbol T316: τ int;
-symbol T317: τ int;
-symbol T318: τ int;
-symbol T319: τ int;
+symbol T310:ℤ;
+symbol T311:ℤ;
+symbol T312:ℤ;
+symbol T313:ℤ;
+symbol T314:ℤ;
+symbol T315:ℤ;
+symbol T316:ℤ;
+symbol T317:ℤ;
+symbol T318:ℤ;
+symbol T319:ℤ;
 
-symbol T320: τ int;
-symbol T321: τ int;
-symbol T322: τ int;
-symbol T323: τ int;
-symbol T324: τ int;
-symbol T325: τ int;
-symbol T326: τ int;
-symbol T327: τ int;
-symbol T328: τ int;
-symbol T329: τ int;
+symbol T320:ℤ;
+symbol T321:ℤ;
+symbol T322:ℤ;
+symbol T323:ℤ;
+symbol T324:ℤ;
+symbol T325:ℤ;
+symbol T326:ℤ;
+symbol T327:ℤ;
+symbol T328:ℤ;
+symbol T329:ℤ;
 
-symbol T330: τ int;
-symbol T331: τ int;
-symbol T332: τ int;
-symbol T333: τ int;
-symbol T334: τ int;
-symbol T335: τ int;
-symbol T336: τ int;
-symbol T337: τ int;
-symbol T338: τ int;
-symbol T339: τ int;
+symbol T330:ℤ;
+symbol T331:ℤ;
+symbol T332:ℤ;
+symbol T333:ℤ;
+symbol T334:ℤ;
+symbol T335:ℤ;
+symbol T336:ℤ;
+symbol T337:ℤ;
+symbol T338:ℤ;
+symbol T339:ℤ;
 
-symbol T340: τ int;
-symbol T341: τ int;
-symbol T342: τ int;
-symbol T343: τ int;
-symbol T344: τ int;
-symbol T345: τ int;
-symbol T346: τ int;
-symbol T347: τ int;
-symbol T348: τ int;
-symbol T349: τ int;
+symbol T340:ℤ;
+symbol T341:ℤ;
+symbol T342:ℤ;
+symbol T343:ℤ;
+symbol T344:ℤ;
+symbol T345:ℤ;
+symbol T346:ℤ;
+symbol T347:ℤ;
+symbol T348:ℤ;
+symbol T349:ℤ;
 
-symbol T350: τ int;
-symbol T351: τ int;
-symbol T352: τ int;
-symbol T353: τ int;
-symbol T354: τ int;
-symbol T355: τ int;
-symbol T356: τ int;
-symbol T357: τ int;
-symbol T358: τ int;
-symbol T359: τ int;
+symbol T350:ℤ;
+symbol T351:ℤ;
+symbol T352:ℤ;
+symbol T353:ℤ;
+symbol T354:ℤ;
+symbol T355:ℤ;
+symbol T356:ℤ;
+symbol T357:ℤ;
+symbol T358:ℤ;
+symbol T359:ℤ;
 
-symbol T360: τ int;
-symbol T361: τ int;
-symbol T362: τ int;
-symbol T363: τ int;
-symbol T364: τ int;
-symbol T365: τ int;
-symbol T366: τ int;
-symbol T367: τ int;
-symbol T368: τ int;
-symbol T369: τ int;
+symbol T360:ℤ;
+symbol T361:ℤ;
+symbol T362:ℤ;
+symbol T363:ℤ;
+symbol T364:ℤ;
+symbol T365:ℤ;
+symbol T366:ℤ;
+symbol T367:ℤ;
+symbol T368:ℤ;
+symbol T369:ℤ;
 
-symbol T370: τ int;
-symbol T371: τ int;
-symbol T372: τ int;
-symbol T373: τ int;
-symbol T374: τ int;
-symbol T375: τ int;
-symbol T376: τ int;
-symbol T377: τ int;
-symbol T378: τ int;
-symbol T379: τ int;
+symbol T370:ℤ;
+symbol T371:ℤ;
+symbol T372:ℤ;
+symbol T373:ℤ;
+symbol T374:ℤ;
+symbol T375:ℤ;
+symbol T376:ℤ;
+symbol T377:ℤ;
+symbol T378:ℤ;
+symbol T379:ℤ;
 
-symbol T380: τ int;
-symbol T381: τ int;
-symbol T382: τ int;
-symbol T383: τ int;
-symbol T384: τ int;
-symbol T385: τ int;
-symbol T386: τ int;
-symbol T387: τ int;
-symbol T388: τ int;
-symbol T389: τ int;
+symbol T380:ℤ;
+symbol T381:ℤ;
+symbol T382:ℤ;
+symbol T383:ℤ;
+symbol T384:ℤ;
+symbol T385:ℤ;
+symbol T386:ℤ;
+symbol T387:ℤ;
+symbol T388:ℤ;
+symbol T389:ℤ;
 
-symbol T390: τ int;
-symbol T391: τ int;
-symbol T392: τ int;
-symbol T393: τ int;
-symbol T394: τ int;
-symbol T395: τ int;
-symbol T396: τ int;
-symbol T397: τ int;
-symbol T398: τ int;
-symbol T399: τ int;
+symbol T390:ℤ;
+symbol T391:ℤ;
+symbol T392:ℤ;
+symbol T393:ℤ;
+symbol T394:ℤ;
+symbol T395:ℤ;
+symbol T396:ℤ;
+symbol T397:ℤ;
+symbol T398:ℤ;
+symbol T399:ℤ;
 
 // 400
 
-symbol T400: τ int;
-symbol T401: τ int;
-symbol T402: τ int;
-symbol T403: τ int;
-symbol T404: τ int;
-symbol T405: τ int;
-symbol T406: τ int;
-symbol T407: τ int;
-symbol T408: τ int;
-symbol T409: τ int;
+symbol T400:ℤ;
+symbol T401:ℤ;
+symbol T402:ℤ;
+symbol T403:ℤ;
+symbol T404:ℤ;
+symbol T405:ℤ;
+symbol T406:ℤ;
+symbol T407:ℤ;
+symbol T408:ℤ;
+symbol T409:ℤ;
 
-symbol T410: τ int;
-symbol T411: τ int;
-symbol T412: τ int;
-symbol T413: τ int;
-symbol T414: τ int;
-symbol T415: τ int;
-symbol T416: τ int;
-symbol T417: τ int;
-symbol T418: τ int;
-symbol T419: τ int;
+symbol T410:ℤ;
+symbol T411:ℤ;
+symbol T412:ℤ;
+symbol T413:ℤ;
+symbol T414:ℤ;
+symbol T415:ℤ;
+symbol T416:ℤ;
+symbol T417:ℤ;
+symbol T418:ℤ;
+symbol T419:ℤ;
 
-symbol T420: τ int;
-symbol T421: τ int;
-symbol T422: τ int;
-symbol T423: τ int;
-symbol T424: τ int;
-symbol T425: τ int;
-symbol T426: τ int;
-symbol T427: τ int;
-symbol T428: τ int;
-symbol T429: τ int;
+symbol T420:ℤ;
+symbol T421:ℤ;
+symbol T422:ℤ;
+symbol T423:ℤ;
+symbol T424:ℤ;
+symbol T425:ℤ;
+symbol T426:ℤ;
+symbol T427:ℤ;
+symbol T428:ℤ;
+symbol T429:ℤ;
 
-symbol T430: τ int;
-symbol T431: τ int;
-symbol T432: τ int;
-symbol T433: τ int;
-symbol T434: τ int;
-symbol T435: τ int;
-symbol T436: τ int;
-symbol T437: τ int;
-symbol T438: τ int;
-symbol T439: τ int;
+symbol T430:ℤ;
+symbol T431:ℤ;
+symbol T432:ℤ;
+symbol T433:ℤ;
+symbol T434:ℤ;
+symbol T435:ℤ;
+symbol T436:ℤ;
+symbol T437:ℤ;
+symbol T438:ℤ;
+symbol T439:ℤ;
 
-symbol T440: τ int;
-symbol T441: τ int;
-symbol T442: τ int;
-symbol T443: τ int;
-symbol T444: τ int;
-symbol T445: τ int;
-symbol T446: τ int;
-symbol T447: τ int;
-symbol T448: τ int;
-symbol T449: τ int;
+symbol T440:ℤ;
+symbol T441:ℤ;
+symbol T442:ℤ;
+symbol T443:ℤ;
+symbol T444:ℤ;
+symbol T445:ℤ;
+symbol T446:ℤ;
+symbol T447:ℤ;
+symbol T448:ℤ;
+symbol T449:ℤ;
 
-symbol T450: τ int;
-symbol T451: τ int;
-symbol T452: τ int;
-symbol T453: τ int;
-symbol T454: τ int;
-symbol T455: τ int;
-symbol T456: τ int;
-symbol T457: τ int;
-symbol T458: τ int;
-symbol T459: τ int;
+symbol T450:ℤ;
+symbol T451:ℤ;
+symbol T452:ℤ;
+symbol T453:ℤ;
+symbol T454:ℤ;
+symbol T455:ℤ;
+symbol T456:ℤ;
+symbol T457:ℤ;
+symbol T458:ℤ;
+symbol T459:ℤ;
 
-symbol T460: τ int;
-symbol T461: τ int;
-symbol T462: τ int;
-symbol T463: τ int;
-symbol T464: τ int;
-symbol T465: τ int;
-symbol T466: τ int;
-symbol T467: τ int;
-symbol T468: τ int;
-symbol T469: τ int;
+symbol T460:ℤ;
+symbol T461:ℤ;
+symbol T462:ℤ;
+symbol T463:ℤ;
+symbol T464:ℤ;
+symbol T465:ℤ;
+symbol T466:ℤ;
+symbol T467:ℤ;
+symbol T468:ℤ;
+symbol T469:ℤ;
 
-symbol T470: τ int;
-symbol T471: τ int;
-symbol T472: τ int;
-symbol T473: τ int;
-symbol T474: τ int;
-symbol T475: τ int;
-symbol T476: τ int;
-symbol T477: τ int;
-symbol T478: τ int;
-symbol T479: τ int;
+symbol T470:ℤ;
+symbol T471:ℤ;
+symbol T472:ℤ;
+symbol T473:ℤ;
+symbol T474:ℤ;
+symbol T475:ℤ;
+symbol T476:ℤ;
+symbol T477:ℤ;
+symbol T478:ℤ;
+symbol T479:ℤ;
 
-symbol T480: τ int;
-symbol T481: τ int;
-symbol T482: τ int;
-symbol T483: τ int;
-symbol T484: τ int;
-symbol T485: τ int;
-symbol T486: τ int;
-symbol T487: τ int;
-symbol T488: τ int;
-symbol T489: τ int;
+symbol T480:ℤ;
+symbol T481:ℤ;
+symbol T482:ℤ;
+symbol T483:ℤ;
+symbol T484:ℤ;
+symbol T485:ℤ;
+symbol T486:ℤ;
+symbol T487:ℤ;
+symbol T488:ℤ;
+symbol T489:ℤ;
 
-symbol T490: τ int;
-symbol T491: τ int;
-symbol T492: τ int;
-symbol T493: τ int;
-symbol T494: τ int;
-symbol T495: τ int;
-symbol T496: τ int;
-symbol T497: τ int;
-symbol T498: τ int;
-symbol T499: τ int;
+symbol T490:ℤ;
+symbol T491:ℤ;
+symbol T492:ℤ;
+symbol T493:ℤ;
+symbol T494:ℤ;
+symbol T495:ℤ;
+symbol T496:ℤ;
+symbol T497:ℤ;
+symbol T498:ℤ;
+symbol T499:ℤ;
 
 // lists
 
 //user	0m0,11s
+
+symbol rev2 ≔
+  T001 + T000;
+
+symbol rev5 ≔
+  T004 + T003 + T002 + T001 + T000;
+
+symbol rev10 ≔
+  T009 + T008 + T007 + T006 + T005 + T004 + T003 + T002 + T001 + T000;
+
+symbol rev12 ≔
+  T011 + T010 +
+  T009 + T008 + T007 + T006 + T005 + T004 + T003 + T002 + T001 + T000;
+
+symbol rev15 ≔
+  T014 + T013 + T012 + T011 + T010 +
+  T009 + T008 + T007 + T006 + T005 + T004 + T003 + T002 + T001 + T000;
+
+symbol rev20 ≔
+  T019 + T018 + T017 + T016 + T015 + T014 + T013 + T012 + T011 + T010 +
+  T009 + T008 + T007 + T006 + T005 + T004 + T003 + T002 + T001 + T000;
+
+/*
+//debug +ew;
+compute ⇧ rev2;
+compute ⇧ rev5;
+compute ⇧ rev10;
+compute ⇧ rev12;
+compute ⇧ rev15;
+compute ⇧ rev20;
+//2  ac: 1	insert: 2	perm: 1
+//5  ac: 4	insert: 14	perm: 10
+//10 ac: 9	insert: 54	perm: 45
+//12 ac: 11	insert: 77	perm: 66
+//15 ac: 14	insert: 119	perm: 105
+//20 ac: 19	insert: 209	perm: 190
+*/
+//rule add (var $x) (var $x) ↪ var $x
+//with add (var $x) (add (var $x) $y) ↪ add (var $x) $y;
+
+/*compute ⇧ rev2;
+compute ⇧ rev5;
+//ac: 16	insert: 46	perm: 10
+compute ⇧ rev10;
+compute ⇧ rev12;
+compute ⇧ rev15;
+compute ⇧ rev20;
+// added aco in whnd_stk but not tree_walk
+//2  ac: 1	insert: 2	perm: 1
+//5  ac: 10	insert: 30	perm: 10
+//10 ac: 45	insert: 210	perm: 45
+//12 ac: 66	insert: 352	perm: 66
+//15 ac: 105	insert: 665	perm: 105
+//20 ac: 190	insert: 1520	perm: 190
+// ac=perm: n(n-1)/2
+*/
 
 symbol rev30 ≔
   T039 + T038 + T037 + T036 + T035 + T034 + T033 + T032 + T031 + T030 +
@@ -614,6 +677,11 @@ symbol rev200 ≔
   T109 + T108 + T107 + T106 + T105 + T104 + T103 + T102 + T101 + T100 +
   rev100;
 //compute ⇧ rev200; //user	0m26s
+// no RW user	0m0,452s
+// with rw ac: 199	insert: 20099	perm: 19900
+
+// with RW  user	0m10,058s
+//ac: 19900	insert: 1353200	perm: 19900
 
 symbol rev300 ≔
   T299 + T298 + T297 + T296 + T295 + T294 + T293 + T292 + T291 + T290 +
@@ -627,7 +695,10 @@ symbol rev300 ≔
   T219 + T218 + T217 + T216 + T215 + T214 + T213 + T212 + T211 + T210 +
   T209 + T208 + T207 + T206 + T205 + T204 + T203 + T202 + T201 + T200 +
   rev200;
-//compute ⇧ rev300; //
+compute ⇧ rev300; //
+// no RW
+//user	0m0,863s
+//ac: 299	insert: 45149	perm: 44850
 
 symbol rev400 ≔
   T399 + T398 + T397 + T396 + T395 + T394 + T393 + T392 + T391 + T390 +
@@ -642,6 +713,9 @@ symbol rev400 ≔
   T309 + T308 + T307 + T306 + T305 + T304 + T303 + T302 + T301 + T300 +
   rev300;
 //compute ⇧ rev400; //
+// no RW
+//user	0m1,502s
+// ac: 399	insert: 80199	perm: 79800
 
 symbol rev500 ≔
   T499 + T498 + T497 + T496 + T495 + T494 + T493 + T492 + T491 + T490 +
@@ -656,6 +730,6 @@ symbol rev500 ≔
   T409 + T408 + T407 + T406 + T405 + T404 + T403 + T402 + T401 + T400 +
   rev400;
 //compute ⇧ rev500; //
-
-
-
+// no RW
+// user	0m2,232s
+// ac: 499	insert: 125249	perm: 124750
