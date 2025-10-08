@@ -591,9 +591,8 @@ symbol rev20 ≔
   T019 + T018 + T017 + T016 + T015 + T014 + T013 + T012 + T011 + T010 +
   T009 + T008 + T007 + T006 + T005 + T004 + T003 + T002 + T001 + T000;
 
-/*
 //debug +ew;
-compute ⇧ rev2;
+/*compute ⇧ rev2;
 compute ⇧ rev5;
 compute ⇧ rev10;
 compute ⇧ rev12;
@@ -605,13 +604,31 @@ compute ⇧ rev20;
 //12 ac: 11	insert: 77	perm: 66
 //15 ac: 14	insert: 119	perm: 105
 //20 ac: 19	insert: 209	perm: 190
-*/
-//rule add (var $x) (var $x) ↪ var $x
-//with add (var $x) (add (var $x) $y) ↪ add (var $x) $y;
 
-/*compute ⇧ rev2;
-compute ⇧ rev5;
-//ac: 16	insert: 46	perm: 10
+compute ⇧ (rev2 + rev2);
+compute ⇧ (rev5 + rev5);
+compute ⇧ (rev10 + rev10);
+compute ⇧ (rev12 + rev12);
+compute ⇧ (rev15 + rev15);
+compute ⇧ (rev20 + rev20);
+//ac: 3	insert: 9	perm: 3
+//ac: 9	insert: 54	perm: 30
+//ac: 19	insert: 209	perm: 135
+//ac: 23	insert: 299	perm: 198
+//ac: 29	insert: 464	perm: 315
+//ac: 39	insert: 819	perm: 570
+// ac: # of +
+*/
+
+// Rewrites rules AC symbol appears on rhs, the term has to be AC-normalized
+// Howerver, we should be able to notice that $y is already sorted...
+// this means 1 insert, constant time
+rule add (var $x) (var $x) ↪ var $x
+with add (var $x) (add (var $x) $y) ↪ add (var $x) $y;
+
+/*
+compute ⇧ rev2;
+compute ⇧ rev5; //slow aliens ac: 16	insert: 46	perm: 10
 compute ⇧ rev10;
 compute ⇧ rev12;
 compute ⇧ rev15;
@@ -624,7 +641,75 @@ compute ⇧ rev20;
 //15 ac: 105	insert: 665	perm: 105
 //20 ac: 190	insert: 1520	perm: 190
 // ac=perm: n(n-1)/2
+
+
+//debug +ew;
+compute ⇧ (rev2 + rev2);
+//tag: 5 	cut: 5	ac: 2	insert: 7	perm: 3
+//compute ⇧ ((T002 + T001 + T000) + (T002 + T001 + T000)); // untag ac: 9	insert: 29	perm: 9
+//tag: 15 	cut: 20	ac: 5	insert: 20	perm: 9
+
+
+compute ⇧ (rev5 + rev5);
+//shr: 11	tag: 0 	cut: 0	ac: 25	insert: 100	perm: 30
+//tag: 93 	cut: 140	ac: 27	insert: 120	perm: 30
+//tag: 309 	cut: 0  	ac: 109	insert: 418	perm: 30
+
+compute ⇧ (rev10 + rev10);
+compute ⇧ (rev12 + rev12);
+compute ⇧ (rev15 + rev15);
+compute ⇧ (rev20 + rev20);
+//2  ac: 4	insert: 11	perm: 3
+//5  ac: 25	insert: 100	perm: 30
+//10 ac: 100	insert: 575	perm: 135
+//12 ac: 144	insert: 926	perm: 198
+//15 ac: 225	insert: 1675	perm: 315
+//20 ac: 400	insert: 3650	perm: 570
+
+// with ac whnf tag
+//shr: 5	tag: 7 	cut: 1	ac: 4	insert: 11	perm: 3
+//shr: 11	tag: 72 	cut: 38	ac: 23	insert: 95	perm: 30
+//shr: 21	tag: 447 	cut: 328	ac: 93	insert: 540	perm: 135
+//shr: 25	tag: 737 	cut: 570	ac: 135	insert: 872	perm: 198
+//shr: 31	tag: 1372 	cut: 1118	ac: 213	insert: 1585	perm: 315
+//shr: 41	tag: 3097 	cut: 2658	ac: 383	insert: 3480	perm: 570
 */
+
+/* 
++no rw, 1 side:
+shr: 1	tag: 1  	cut: 0	ac: 1	insert: 2	perm: 1
+shr: 1	tag: 4  	cut: 3	ac: 1	insert: 5	perm: 10
+shr: 1	tag: 9  	cut: 8	ac: 1	insert: 10	perm: 45
+shr: 1	tag: 11 	cut: 10	ac: 1	insert: 12	perm: 66
+shr: 1	tag: 14 	cut: 13	ac: 1	insert: 15	perm: 105
+shr: 1	tag: 19 	cut: 18	ac: 1	insert: 20	perm: 190
+
++no rw, 2 sides:
+shr: 3	tag: 3  	cut: 2	ac: 1	insert: 4	perm: 3
+shr: 3	tag: 9  	cut: 8	ac: 1	insert: 10	perm: 30
+shr: 3	tag: 19 	cut: 18	ac: 1	insert: 20	perm: 135
+shr: 3	tag: 23 	cut: 22	ac: 1	insert: 24	perm: 198
+shr: 3	tag: 29 	cut: 28	ac: 1	insert: 30	perm: 315
+shr: 3	tag: 39 	cut: 38	ac: 1	insert: 40	perm: 570
+
++rw, 1 side:
+shr: 1	tag: 1  	cut: 0  	ac: 1	insert: 2	perm: 1
+shr: 1	tag: 4  	cut: 9  	ac: 1	insert: 5	perm: 10
+shr: 1	tag: 9  	cut: 44  	ac: 1	insert: 10	perm: 45
+shr: 1	tag: 11 	cut: 65 	ac: 1	insert: 12	perm: 66
+shr: 1	tag: 14 	cut: 104	ac: 1	insert: 15	perm: 105
+shr: 1	tag: 19 	cut: 189	ac: 1	insert: 20	perm: 190
+
++rw, 2 sides:
+shr: 5	tag: 4  	cut: 2  	ac: 2	insert: 6	perm: 3
+shr: 11	tag: 19 	cut: 23 	ac: 5	insert: 24	perm: 30
+shr: 21	tag: 64 	cut: 118	ac: 10	insert: 74	perm: 135
+shr: 25	tag: 89 	cut: 177	ac: 12	insert: 101	perm: 198
+shr: 31	tag: 134 	cut: 288	ac: 15	insert: 149	perm: 315
+shr: 41	tag: 229 	cut: 533	ac: 20	insert: 249	perm: 570
+
+*/
+
 
 symbol rev30 ≔
   T039 + T038 + T037 + T036 + T035 + T034 + T033 + T032 + T031 + T030 +
@@ -682,6 +767,16 @@ symbol rev200 ≔
 
 // with RW  user	0m10,058s
 //ac: 19900	insert: 1353200	perm: 19900
+// +ac tagging
+//shr: 101	tag: 199 	cut: 198	ac: 1	insert: 200	perm: 19900
+//user	0m0,304s
+// RW, tags
+//user	0m0,577s
+//shr: 101	tag: 199 	cut: 19899	ac: 1	insert: 200	perm: 19900
+
+//compute ⇧ (rev200 + rev200);
+//user	0m1,320s
+//shr: 601	tag: 20299 	cut: 59303	ac: 200	insert: 20499	perm: 59700
 
 symbol rev300 ≔
   T299 + T298 + T297 + T296 + T295 + T294 + T293 + T292 + T291 + T290 +
@@ -695,10 +790,13 @@ symbol rev300 ≔
   T219 + T218 + T217 + T216 + T215 + T214 + T213 + T212 + T211 + T210 +
   T209 + T208 + T207 + T206 + T205 + T204 + T203 + T202 + T201 + T200 +
   rev200;
-compute ⇧ rev300; //
+//compute ⇧ rev300; //
 // no RW
 //user	0m0,863s
 //ac: 299	insert: 45149	perm: 44850
+// no rw, tags
+//user	0m0,558s
+//shr: 201	tag: 299 	cut: 298	ac: 1	insert: 300	perm: 44850
 
 symbol rev400 ≔
   T399 + T398 + T397 + T396 + T395 + T394 + T393 + T392 + T391 + T390 +
@@ -716,6 +814,9 @@ symbol rev400 ≔
 // no RW
 //user	0m1,502s
 // ac: 399	insert: 80199	perm: 79800
+// no rw, tags
+//user	0m0,926s
+//shr: 301	tag: 399 	cut: 398	ac: 1	insert: 400	perm: 79800
 
 symbol rev500 ≔
   T499 + T498 + T497 + T496 + T495 + T494 + T493 + T492 + T491 + T490 +
@@ -733,3 +834,14 @@ symbol rev500 ≔
 // no RW
 // user	0m2,232s
 // ac: 499	insert: 125249	perm: 124750
+// no rw, tags
+//user	0m1,436s
+//shr: 401	tag: 499 	cut: 498	ac: 1	insert: 500	perm: 124750
+// RW, tags
+//user	0m3,322s
+//shr: 401	tag: 499 	cut: 124749	ac: 1	insert: 500	perm: 124750
+
+compute ⇧ (rev500 + rev500);
+//user	0m7,858s
+//shr: 1801	tag: 125749 	cut: 373253	ac: 500	insert: 126249	perm: 374250
+

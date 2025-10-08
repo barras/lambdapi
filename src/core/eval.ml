@@ -52,10 +52,14 @@ let counter, reset =
 let ins = counter ()
 let perm = counter ()
 let ac = counter()
+let tag = counter()
+let ac_cut = counter()
+let shr = counter()
 
 let stat() =
-  out Stdlib.(!Error.err_fmt)
-    "ac: %d\tinsert: %d\tperm: %d\n" !ac !ins !perm;
+(*  out Stdlib.(!Error.err_fmt)
+    "shr: %d\ttag: %d \tcut: %d\tac: %d\tinsert: %d\tperm: %d\n"
+    !shr !tag !ac_cut !ac !ins !perm;*)
   reset()
 
 let _ = at_exit stat
@@ -85,15 +89,73 @@ let get2_args_or_ac t1 t2 ~ac ~nonac =
   | (h1,stk1),(h2,stk2) -> nonac h1 stk1 h2 stk2
      
 
+
+let ac_mv =
+  { meta_key   = -1
+  ; meta_type  = Timed.ref Kind
+  ; meta_arity = 1
+  ; meta_value = let x = new_var "ac" in Timed.ref (Some(bind_mvar [|x|] (Vari x))) }
+
+let tag_ac t = incr tag; Meta(ac_mv,[|t|])
+
+(*let term_tag t =
+  match t with
+  | Bvar _ -> "Bvar"
+  | Vari _ -> "Vari"
+  | Type -> "TYPE"
+  | Kind -> "KIND"
+  | Symb _ -> "Symb"
+  | Prod _ -> "Prod"
+  | Abst _ -> "Abst"
+  | Appl _ -> "Appl"
+  | Meta _ -> "Meta"
+  | Patt _ -> "Patt"
+  | Plac _ -> "Plac"
+  | Wild -> "Wild"
+  | TRef _ -> "TRef"
+  | LLet _ -> "LLet"
+ *)
+let rec is_ac_whnf t =
+  match t with
+  | Meta(m,_) when m == ac_mv -> true
+  | Meta(m, ts) ->
+      begin
+        match Timed.(!(m.meta_value)) with
+        | None    -> false
+        | Some(b) -> is_ac_whnf (msubst b ts)
+      end
+  | TRef(r) ->
+      begin
+        match Timed.(!r) with
+        | None    -> false
+        | Some(v) -> is_ac_whnf v
+      end
+  | _ -> false
+
+let term =
+  let v = ac_mv.meta_value in
+  let bd = Timed.(!v) in
+  fun ppf t ->
+  let b = Timed.(!print_meta_args) in
+  Timed.(print_meta_args := true);
+  Timed.(v := None);
+  Print.term ppf t;
+  Timed.(print_meta_args := b);
+  Timed.(v := bd)
+
+
 (** [app2 s t1 t2] builds the application of [s] to [t1] and [t2]. *)
 let app2 s t1 t2 = Appl(Appl(Symb s, t1), t2)
+let app2_ac s t1 t2 = tag_ac(Appl(Appl(Symb s, t1), t2))
+
+
 
 (** [left_comb (+) [t1;t2;t3]] generates [((t1+t2)+t3)]. *)
 let left_comb s =
   let rec comb acc ts =
     match ts with
     | [] -> acc
-    | t::ts -> comb (app2 s acc t) ts
+    | t::ts -> comb (app2_ac s acc t) ts
   in
   function
   | [] | [_] -> assert false
@@ -104,7 +166,7 @@ let right_comb s =
   let rec comb ts acc =
     match ts with
     | [] -> acc
-    | t::ts -> comb ts (app2 s t acc)
+    | t::ts -> comb ts (app2_ac s t acc)
   in
   fun ts ->
   match List.rev ts with
@@ -236,10 +298,12 @@ type stack = term list
 
 (** [to_tref t] transforms {!constructor:Appl} into
    {!constructor:TRef}. *)
+(* BB: create a ref for LLet? *)
 let to_tref : term -> term = fun t ->
   match t with
   | Appl _ -> TRef(Timed.ref(Some t))
   | Symb s when s.sym_prop <> Const -> TRef(Timed.ref(Some t))
+  | t when is_ac_whnf t -> TRef(Timed.ref(Some t))
   | t -> t
 
 (** {1 Define the main {!whnf} function that takes a {!config} as argument} *)
@@ -366,7 +430,7 @@ let tree_walk : (sym option -> term -> term) -> dtree -> stack -> (term * stack)
           if Stdlib.(!steps) <> s then
             begin
               match examined with
-              | TRef(v) -> Timed.(v := Some(add_args t args))
+              | TRef(v) -> incr shr; log_whnf "update"; Timed.(v := Some(add_args t args))
               | _       -> ()
             end;
           let cursor =
@@ -704,6 +768,7 @@ let aliens norm f t1 t2 =
   | _ -> assert false
 
 
+
 (** [ac norm t] computes a head-AC [norm] form. *)
 let ac aco norm t =
   match get_args t, aco with
@@ -739,9 +804,11 @@ let whnf : config -> term -> term = fun cfg ->
   (* [whnf_stk t stk] computes a whnf of [add_args t stk]. *)
   and whnf_stk : sym option -> term -> stack -> term * stack = fun aco t stk ->
     if Logger.log_enabled () then
-      log_whnf "%awhnf_stk %a %a %a" (D.option sym) aco D.depth !depth term t (D.list term) stk;
-    let t = unfold (ac aco (deep whnf) t) in
-    match t with
+      log_whnf "%awhnf_stk %a %a %a" D.depth !depth (D.option sym) aco term t (D.list term) stk;
+    let t =
+      if is_ac_whnf t then (log_whnf "%aAC whnf: %a" D.depth !depth term t;incr ac_cut; t)
+      else ac aco (deep whnf) t in
+    match unfold t with
     | Appl(f,u) -> whnf_stk aco f (to_tref u::stk)
     (*| _ ->
       if Logger.log_enabled() then
