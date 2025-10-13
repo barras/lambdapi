@@ -57,9 +57,9 @@ let ac_cut = counter()
 let shr = counter()
 
 let stat() =
-(*  out Stdlib.(!Error.err_fmt)
+  out Stdlib.(!Error.err_fmt)
     "shr: %d\ttag: %d \tcut: %d\tac: %d\tinsert: %d\tperm: %d\n"
-    !shr !tag !ac_cut !ac !ins !perm;*)
+    !shr !tag !ac_cut !ac !ins !perm;
   reset()
 
 let _ = at_exit stat
@@ -134,8 +134,8 @@ let rec is_ac_whnf t =
 
 let term =
   let v = ac_mv.meta_value in
-  let bd = Timed.(!v) in
   fun ppf t ->
+  let bd = Timed.(!v) in
   let b = Timed.(!print_meta_args) in
   Timed.(print_meta_args := true);
   Timed.(v := None);
@@ -301,6 +301,7 @@ type stack = term list
 (* BB: create a ref for LLet? *)
 let to_tref : term -> term = fun t ->
   match t with
+  | TRef _ -> t
   | Appl _ -> TRef(Timed.ref(Some t))
   | Symb s when s.sym_prop <> Const -> TRef(Timed.ref(Some t))
   | t when is_ac_whnf t -> TRef(Timed.ref(Some t))
@@ -662,37 +663,47 @@ let norm_cmp norm : term effect_comparison_function =
 
 (** {1 AC normaliaation} *)
 
-(*
-let merge norm ord al bl acc =
+let rec merge2 norm ord al bl acc =
   match al,bl with
   | [], _ -> List.rev_append acc bl
   | _, [] -> List.rev_append acc al
   | a::al, b::bl ->
+     incr perm;
      let (c,a',b') = norm a b in
-     if ord c then merge norm ord (a'::al) bl (b'::acc)
-     else merge norm ord al (b'::bl) (a'::norm)
-
+     if ord c then merge2 norm ord (a'::al) bl (b'::acc)
+     else merge2 norm ord al (b'::bl) (a'::acc)
+(* Merge sort... *)
 let rec merge_step norm ord ll acc =
   match ll with
   | [] -> acc
   | [l] -> l::acc
-  | l1::l2::ll -> merge_step norm ord ll (merge l1 l2::acc)
+  | l1::l2::ll ->  incr ins; merge_step norm ord ll (merge2 norm ord l1 l2 []::acc)
+
+let rec is_sorted norm ord all =
+  match all with
+  | [] | [_] -> true
+  | al1::((a2::_)::_ as all) ->
+     (match List.rev al1 with
+     | a1::_ ->
+        (*log_whnf "MERGE CMP: %a >? %a" term a1 term a2;*)
+        let (c,_,_) = norm a1 a2 in
+        if ord c then false else is_sorted norm ord all
+     | [] -> assert false)
+  | _::[]::_ -> assert false
 
 let rec merge norm ord ll =
   match ll with 
   | [] -> []
   | [l] -> l
-  | _ -> merge norm ord (merge_step norm ord ll)
-
-
-let rec unsorted_elts norm ord revsrt l unsrt =
-  match l, revsrt with
-  | [],_ -> List.rev srt, unsrt
-  | y::l, x::revsrt ->
-     let c,x',y' = norm x y in
-     if ord c then (* y > x *) unsorted_elts norm ord 
-     else unsorted_elts norm ord (y'::revsrt
- *)
+  | _ -> merge norm ord (merge_step norm ord ll [])
+let merge norm ord al =
+  let all = List.map (fun (wh,f,a) -> if wh then get_ac f a else [a]) al in
+  if is_sorted norm ord all then
+    (log_whnf "MERGE: already sorted %a" (D.list (D.list term)) all;
+     List.flatten all)
+  else
+    (log_whnf "MERGE: %a" (D.list (D.list term)) all;
+     merge norm ord all)
 
 let insert norm ord t =
   incr ins;
@@ -707,10 +718,15 @@ let insert norm ord t =
        else t::t1::ts in
   aux
 
-let sort_aliens norm al =
+(* Insertion sort *)
+let _sort_aliens norm al =
   List.fold_left
     (fun sortd t -> insert (norm_cmp norm) (fun c -> c>0) t sortd)
     [] (List.rev al)
+
+(* merge sort *)
+let sort_aliens norm al =
+  merge (norm_cmp norm) (fun c -> c>0) al
 
 
 (* Determines whether [t] reduces to [f t1 t2] and call [ac], otherwise
@@ -727,8 +743,10 @@ let dest_ac norm f t ~ac ~nonac =
   | _ ->*)
      let t = norm t in
      (match get_args t with
-     | Symb g, [t1;t2] when f==g -> ac t1 t2
-     | _ -> nonac t) 
+     | Symb g, [t1;t2] when f==g ->
+        if is_ac_whnf t then nonac true t
+        else ac t1 t2
+     | _ -> nonac false t) 
 
 
 (* /!\ right subterms [rts] (out spine) in regular order
@@ -739,8 +757,8 @@ let left_aliens norm f t1 t2 =
       ~ac:(fun t11 t12 ->
         if out_spine then Stdlib.incr steps;
         proc out_spine t11 (t12::rts) racc)
-      ~nonac:(fun t1' ->
-        let racc' = t1'::racc in
+      ~nonac:(fun wh t1' ->
+        let racc' = (wh,f,t1')::racc in
         (match rts with
           [] -> List.rev racc'
         | t2::rts -> proc true t2 rts racc'))
@@ -754,8 +772,8 @@ let right_aliens norm f t1 t2 =
       ~ac:(fun t21 t22 ->
         if out_spine then Stdlib.incr steps;
         proc out_spine (t21::rlts) t22 acc)
-    ~nonac:(fun t2' ->
-      let acc' = t2'::acc in
+    ~nonac:(fun wh t2' ->
+      let acc' = (wh,f,t2')::acc in
       (match rlts with
         [] -> acc'
       | t1::rlts -> proc true rlts t1 acc'))
@@ -779,7 +797,7 @@ let ac aco norm t =
         incr ac;
         if Logger.log_enabled () then log_whnf "AC<- %a" term (app2 f t1 t2);
         let al = aliens (norm (Some f)) f t1 t2 in
-        if Logger.log_enabled () then log_whnf "AC aliens: %a = %a" term (app2 f t1 t2) (D.list term) al;
+        if Logger.log_enabled () then log_whnf "AC aliens: %a = %a" term (app2 f t1 t2) (D.list (D.pair D.bool term)) (List.map (fun (wh,_,t)->wh,t) al);
         let al = sort_aliens (norm None) al in
         if Logger.log_enabled () then log_whnf "AC-> %a => %a" term (app2 f t1 t2) (D.list term) al;
         comb f al
