@@ -40,6 +40,7 @@ let eta_equality : bool Timed.ref = Console.register_flag "eta_equality" false
 (** Counter used to preserve physical equality in {!val:whnf}. *)
 let steps : int Stdlib.ref = Stdlib.ref 0
 
+let _ = Timed.(print_tref := true)
 
 let counter, reset =
   let l = Stdlib.ref [] in
@@ -49,20 +50,24 @@ let counter, reset =
     r),
   (fun () -> List.iter (fun r -> r := 0) !l)
 
+
+let cwhnf = counter()
+let idwhnf = counter()
 let ins = counter ()
 let perm = counter ()
 let ac = counter()
 let tag = counter()
 let ac_cut = counter()
 let shr = counter()
+let cut_shr = counter()
 
 let stat() =
   out Stdlib.(!Error.err_fmt)
-    "shr: %d\ttag: %d \tcut: %d\tac: %d\tinsert: %d\tperm: %d\n"
-    !shr !tag !ac_cut !ac !ins !perm;
+    "pwhnf: %d\tidwhnf: %d\t   shr: %d\tcutshr: %d\tAC tag: %d \tAC cut: %d\tAC norm: %d\tperm: %d\n"
+    (!cwhnf - !idwhnf) !idwhnf !shr !cut_shr !tag !ac_cut !ac !perm;
   reset()
 
-let _ = at_exit stat
+(*let _ = at_exit stat*)
 
 (** {1 Simple term manipulations related to AC *)
 
@@ -89,6 +94,40 @@ let get2_args_or_ac t1 t2 ~ac ~nonac =
   | (h1,stk1),(h2,stk2) -> nonac h1 stk1 h2 stk2
      
 
+let tag_meta mv t = Meta(mv,[|t|])
+
+let _ = tag_meta
+
+let rec tag_unfold mvl t =
+  match t with
+  | Meta(m,_) when List.memq m mvl -> t
+  | Meta(m, ts) ->
+      begin
+        match Timed.(!(m.meta_value)) with
+        | None    -> t
+        | Some(b) -> tag_unfold mvl (msubst b ts)
+      end
+  | TRef(r) ->
+      begin
+        match Timed.(!r) with
+        | None    -> t
+        | Some(v) -> tag_unfold mvl v
+      end
+  | _ -> t
+
+let whnf_mv =
+  { meta_key   = -2
+  ; meta_type  = Timed.ref Kind
+  ; meta_arity = 1
+  ; meta_value = let x = new_var "whnf" in Timed.ref (Some(bind_mvar [|x|] (Vari x))) }
+
+let is_whnf t =
+  match tag_unfold [whnf_mv] t with
+  | Meta(m,_) when m == whnf_mv -> true
+  | _ -> false
+
+let tag_whnf t =
+  if is_whnf t then t else (*incr tag;*) tag_meta whnf_mv t
 
 let ac_mv =
   { meta_key   = -1
@@ -96,7 +135,13 @@ let ac_mv =
   ; meta_arity = 1
   ; meta_value = let x = new_var "ac" in Timed.ref (Some(bind_mvar [|x|] (Vari x))) }
 
-let tag_ac t = incr tag; Meta(ac_mv,[|t|])
+let is_ac_whnf t =
+  match tag_unfold [ac_mv] t with
+  | Meta(m,_) when m == ac_mv -> true
+  | _ -> false
+
+let tag_ac t = t
+(*let tag_ac t = if is_ac_whnf t then t else (incr tag; tag_meta ac_mv t)*)
 
 (*let term_tag t =
   match t with
@@ -115,33 +160,21 @@ let tag_ac t = incr tag; Meta(ac_mv,[|t|])
   | TRef _ -> "TRef"
   | LLet _ -> "LLet"
  *)
-let rec is_ac_whnf t =
-  match t with
-  | Meta(m,_) when m == ac_mv -> true
-  | Meta(m, ts) ->
-      begin
-        match Timed.(!(m.meta_value)) with
-        | None    -> false
-        | Some(b) -> is_ac_whnf (msubst b ts)
-      end
-  | TRef(r) ->
-      begin
-        match Timed.(!r) with
-        | None    -> false
-        | Some(v) -> is_ac_whnf v
-      end
-  | _ -> false
+
+let all_tags = [ac_mv; whnf_mv]
+
+let tags_unfold = tag_unfold all_tags
 
 let term =
-  let v = ac_mv.meta_value in
+  let vl = List.map (fun m -> m.meta_value) all_tags in
   fun ppf t ->
-  let bd = Timed.(!v) in
+  let bdl = List.map (fun v -> (v,Timed.(!v))) vl in
   let b = Timed.(!print_meta_args) in
   Timed.(print_meta_args := true);
-  Timed.(v := None);
+  List.iter (fun v -> Timed.(v := None)) vl;
   Print.term ppf t;
   Timed.(print_meta_args := b);
-  Timed.(v := bd)
+  List.iter (fun (v,bd) -> Timed.(v := bd)) bdl
 
 
 (** [app2 s t1 t2] builds the application of [s] to [t1] and [t2]. *)
@@ -188,7 +221,7 @@ let comb s =
 (** [hnf whnf t] computes a hnf of [t] using [whnf]. *)
 let hnf : (term -> term) -> (term -> term) = fun whnf ->
   let rec hnf t =
-    match whnf t with
+    match unfold (whnf t) with
     | Abst(a,t) -> Abst(a, let x,t = unbind t in bind_var x (hnf t))
     | t -> t
   in hnf
@@ -199,7 +232,7 @@ let snf : (term -> term) -> (term -> term) = fun whnf ->
     if Logger.log_enabled() then log_snf "snf %a" term t;
     let t = whnf t in
     if Logger.log_enabled() then log_snf "whnf = %a" term t;
-    match t with
+    match unfold t with
     | Vari _
     | Type
     | Kind
@@ -298,14 +331,26 @@ type stack = term list
 
 (** [to_tref t] transforms {!constructor:Appl} into
    {!constructor:TRef}. *)
-(* BB: create a ref for LLet? *)
 let to_tref : term -> term = fun t ->
   match t with
   | TRef _ -> t
-  | Appl _ -> TRef(Timed.ref(Some t))
+  | Appl _ | LLet _ -> TRef(Timed.ref(Some t))
   | Symb s when s.sym_prop <> Const -> TRef(Timed.ref(Some t))
   | t when is_ac_whnf t -> TRef(Timed.ref(Some t))
   | t -> t
+
+let shareable_args : term -> term = fun t ->
+  incr shr;
+  let h, args = get_args t in
+  let args' = List.map to_tref args in
+  let t' = add_args h args' in
+  if List.for_all2 (fun a a' -> a==a') args args'
+(*  then incr cut_shr;*)
+  then (incr cut_shr; t)
+  else
+    let t' = if is_ac_whnf t then tag_ac t' else t' in
+    let t' = if is_whnf t then tag_whnf t' else t' in
+    t'
 
 (** {1 Define the main {!whnf} function that takes a {!config} as argument} *)
 let depth = Stdlib.ref 0
@@ -422,20 +467,26 @@ let tree_walk : (sym option -> term -> term) -> dtree -> stack -> (term * stack)
         else
           let s = Stdlib.(!steps) in
 (*          let _ = log_whnf "Node start reduce" in*)
-          let (t, args) = incr_depth (fun () -> get_args (norm None examined)) in
+          let narg = incr_depth (fun () -> norm None (tags_unfold examined)) in
 (*          let _ = log_whnf "Node end reduce" in*)
-          let args = if store then List.map to_tref args else args in
+          let orig_narg = narg in
+          let narg =
+            if store then (log_whnf"store";  shareable_args narg)
+            else narg in
+          let t,args = get_args narg in
           (* If some reduction has been performed by [norm] ([steps <>
              0]), update the value of [examined] which may be stored into
              [vars]. *)
           if Stdlib.(!steps) <> s then
             begin
               match examined with
-              | TRef(v) -> incr shr; log_whnf "update"; Timed.(v := Some(add_args t args))
+              | TRef(v) -> log_whnf "update %a with %a" (D.option term) Timed.(!v) term narg; Timed.(v := Some narg)
               | _       -> ()
             end;
+          if is_ac_whnf narg then
+            log_whnf "lost sharing AC whnf: %a" term orig_narg;
           let cursor =
-            if store then (vars.(cursor) <- add_args t args; cursor + 1)
+            if store then (vars.(cursor) <- narg; cursor + 1)
             else cursor
           in
           (* [default ()] carries on the matching on the default branch of the
@@ -457,37 +508,37 @@ let tree_walk : (sym option -> term -> term) -> dtree -> stack -> (term * stack)
             let stk = List.reconstruct left (a::body::args) right in
             walk tr stk cursor vars_id id_vars
           in
-          match t with
+          match unfold t with
           | Type       ->
               begin
-                try
-                  let matched = TCMap.find TC.Type children in
-                  let stk = List.reconstruct left args right in
-                  walk matched stk cursor vars_id id_vars
-                with Not_found -> default ()
+                match TCMap.find TC.Type children with
+                | matched ->
+                   let stk = List.reconstruct left args right in
+                   walk matched stk cursor vars_id id_vars
+                | exception Not_found -> default ()
               end
           | Symb(s)    ->
               let cons = TC.Symb(s.sym_path, s.sym_name, List.length args) in
               begin
-                try
-                  (* Get the next sub-tree. *)
-                  let matched = TCMap.find cons children in
-                  (* Re-insert the arguments the symbol is applied to in the
-                     stack. *)
-                  let stk = List.reconstruct left args right in
-                  walk matched stk cursor vars_id id_vars
-                with Not_found -> default ()
+                (* Get the next sub-tree. *)
+                match TCMap.find cons children with
+                | matched ->
+                   (* Re-insert the arguments the symbol is applied to in the
+                      stack. *)
+                   let stk = List.reconstruct left args right in
+                   walk matched stk cursor vars_id id_vars
+                | exception Not_found -> default ()
               end
           | Vari(x)    ->
               begin
-                try
-                  let id = VarMap.find x vars_id in
-                  let matched = TCMap.find (TC.Vari(id)) children in
-                  (* Re-insert the arguments the variable is applied to in the
-                     stack. *)
-                  let stk = List.reconstruct left args right in
-                  walk matched stk cursor vars_id id_vars
-                with Not_found -> default ()
+                match VarMap.find x vars_id with
+                | id ->
+                   let matched = TCMap.find (TC.Vari(id)) children in
+                   (* Re-insert the arguments the variable is applied to in the
+                      stack. *)
+                   let stk = List.reconstruct left args right in
+                   walk matched stk cursor vars_id id_vars
+                | exception Not_found -> default ()
               end
           | Abst(a, b) ->
               begin
@@ -738,9 +789,9 @@ let sort_aliens norm al =
    This would be even better, e.g. for f(t1,a) when a reduces to f(t2,t3)
    we could avoid sorting [t2;t3], then [t1;t2;t3] *)
 let dest_ac norm f t ~ac ~nonac =
-(*  match get_args t with
+  match get_args t with
   | Symb g, [t1;t2] when f==g -> ac t1 t2
-  | _ ->*)
+  | _ ->
      let t = norm t in
      (match get_args t with
      | Symb g, [t1;t2] when f==g ->
@@ -789,7 +840,8 @@ let aliens norm f t1 t2 =
 
 (** [ac norm t] computes a head-AC [norm] form. *)
 let ac aco norm t =
-  match get_args t, aco with
+  if is_ac_whnf t then (log_whnf "%aAC whnf: %a" D.depth !depth term t;incr ac_cut; t)
+  else match get_args t, aco with
   | (Symb f, [_;_]), Some g when f==g -> t
   | (Symb f, [t1;t2]), _ ->
      begin match f.sym_prop with
@@ -815,19 +867,23 @@ let ac aco norm t =
 let whnf : config -> term -> term = fun cfg ->
   (* [whnf t] computes a whnf of [t]. *)
   let rec whnf aco t =
-    let n = Stdlib.(!steps) in
-    let u, stk = whnf_stk aco t [] in
-    if Stdlib.(!steps) <> n then add_args u stk else unfold t
+    if is_whnf t then t else 
+      (incr cwhnf;
+       let n = Stdlib.(!steps) in
+       let u = whnf_stk aco t [] in
+       if Stdlib.(!steps) <> n then u else (incr idwhnf; tags_unfold t))
 
   (* [whnf_stk t stk] computes a whnf of [add_args t stk]. *)
-  and whnf_stk : sym option -> term -> stack -> term * stack = fun aco t stk ->
+  and whnf_stk : sym option -> term -> stack -> term = fun aco t stk ->
     if Logger.log_enabled () then
       log_whnf "%awhnf_stk %a %a %a" D.depth !depth (D.option sym) aco term t (D.list term) stk;
-    let t =
-      if is_ac_whnf t then (log_whnf "%aAC whnf: %a" D.depth !depth term t;incr ac_cut; t)
-      else ac aco (deep whnf) t in
+    let t = ac aco (deep whnf) t in
+    let t = shareable_args t in
+    let orig_st = lazy(add_args t stk) in
+    let t, args = get_args t in
+    let stk = args @ stk in
     match unfold t with
-    | Appl(f,u) -> whnf_stk aco f (to_tref u::stk)
+    | Appl _ -> assert false
     (*| _ ->
       if Logger.log_enabled() then
       log_whnf "%awhnf_stk %a %a" D.depth !depth term t (D.list term) stk;
@@ -836,7 +892,7 @@ let whnf : config -> term -> term = fun cfg ->
         begin
           match stk with
           | u::stk -> Stdlib.incr steps; whnf_stk aco (subst f u) stk
-          | _ -> t, stk
+          | _ -> tag_whnf (Lazy.force orig_st)
         end
     | LLet(_,t,u) ->
         (*FIXME? instead of doing a substitution now, add a local definition
@@ -844,20 +900,20 @@ let whnf : config -> term -> term = fun cfg ->
           the following makes tests/OK/725.lp fail: *)
         (*let x,u = unbind u in
           whnf_stk {cfg with varmap = VarMap.add x t cfg.varmap} u stk*)
-        Stdlib.incr steps; whnf_stk aco (subst u t) stk
-    | Symb f when is_sym_aco f aco -> t, stk
+        Stdlib.incr steps; whnf_stk aco (subst u (to_tref t)) stk
+    | Symb f when is_sym_aco f aco -> Lazy.force orig_st
     | Symb s ->
         begin match Timed.(!(s.sym_def)) with
         (* The invariant that defined symbols are subject to no
            rewriting rules is false during indexing for websearch;
            that's the reason for the when in the next line *)
         | Some u when Tree_type.is_empty (cfg.dtree s) ->
-            if Timed.(!(s.sym_opaq)) || not cfg.expand_defs then t, stk
+            if Timed.(!(s.sym_opaq)) || not cfg.expand_defs then tag_whnf (Lazy.force orig_st)
             else (Stdlib.incr steps; whnf_stk aco u stk)
-        | None when not cfg.rewrite -> t, stk
+        | None when not cfg.rewrite -> tag_whnf (Lazy.force orig_st)
         | _ ->
            begin match tree_walk whnf (cfg.dtree s) stk with
-           | None -> log_whnf "%ano rule applies" D.depth !depth; t, stk
+           | None -> log_whnf "%ano rule applies for %a" D.depth !depth term (Lazy.force orig_st); tag_whnf (Lazy.force orig_st)
            | Some (t, rstk) ->
               if Logger.log_enabled () then
                 log_whnf "%aapply rewrite rule (lhs stack %a)" D.depth !depth (D.list term) stk;
@@ -867,9 +923,9 @@ let whnf : config -> term -> term = fun cfg ->
     | Vari x ->
         begin match VarMap.find_opt x cfg.varmap with
         | Some v -> Stdlib.incr steps; whnf_stk aco v stk
-        | None -> t, stk
+        | None -> tag_whnf (Lazy.force orig_st)
         end
-    | _ -> t, stk
+    | _ -> tag_whnf (Lazy.force orig_st)
   in fun t ->
      log_whnf "Start top whnf %a" term t;
      let t' = whnf None t in
@@ -889,6 +945,7 @@ let time_reducer (f: reducer): reducer =
     the context [c]. The function [dtree] maps symbols to dtrees. *)
 let snf : ?dtree:(sym -> dtree) -> reducer = fun ?dtree ?tags c t ->
   Stdlib.(steps := 0);
+  reset();
   let u = snf (whnf (make ?dtree ?tags c)) t in
   stat();
   if Stdlib.(!steps = 0) then unfold t else u
@@ -927,7 +984,7 @@ let pure_eq_modulo : ?tags:rw_tag list -> ctxt -> term -> term -> bool =
 let whnf : reducer = fun ?tags c t ->
   Stdlib.(steps := 0);
   let u = whnf (make ?tags c) t in
-  if Stdlib.(!steps = 0) then unfold t else u
+  if Stdlib.(!steps = 0) then unfold t else unfold u
 
 let whnf = time_reducer whnf
 

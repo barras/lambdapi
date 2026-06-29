@@ -24,6 +24,9 @@ let print_domains : bool ref = Console.register_flag "print_domains" false
 (** Flag for printing implicit arguments. *)
 let print_implicits : bool ref = Console.register_flag "print_implicits" false
 
+(* Flag for printing defined TRef between [..] *)
+let print_tref : bool ref = ref false
+
 (** Flag for printing the type of uninstanciated metavariables. Remark: this
    does not generate parsable terms; use for debug only. *)
 let print_meta_types : bool ref =
@@ -252,21 +255,26 @@ and term : term pp = fun ppf t ->
   and head wrap ppf t =
     let env ppf ts =
       if Array.length ts > 0 then out ppf ".[%a]" (Array.pp func ";") ts in
-    match unfold t with
+    match t with
     | Appl(_,_)   -> assert false
     (* Application is handled separately, unreachable. *)
     | Wild        -> out ppf "_"
     | TRef(r)     ->
         (match !r with
          | None -> out ppf "<TRef>"
-         | Some t -> atom ppf t)
+         | Some t ->
+            if !print_tref then (out ppf "{"; head false ppf t; out ppf "}")
+            else atom ppf t)
     (* Atoms are printed inconditonally. *)
     | Vari(x)     -> var ppf x
     | Type        -> out ppf "TYPE"
     | Kind        -> out ppf "KIND"
     | Symb(s)     -> sym ppf s
     | Meta(m,e)   ->
-        if !print_meta_args then out ppf "%a%a" meta m env e else meta ppf m
+       (match !(m.meta_value) with
+       | Some v -> head wrap ppf (msubst v e)
+       | None ->
+          if !print_meta_args then out ppf "%a%a" meta m env e else meta ppf m)
     | Plac(_)     -> out ppf "_"
     | Patt(_,n,e) -> out ppf "$%a%a" uid n env e
     | Bvar _      -> assert false

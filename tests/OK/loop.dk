@@ -1,0 +1,17 @@
+
+Bool : Type.
+true : Bool.
+
+defac and [Bool].
+
+
+
+Nat : Type.     (; Type of predicative Type levels ;)
+
+defac max [Nat].
+
+def Leq : Nat -> Nat -> Bool.
+
+[i,j,k] Leq (max i j) k         --> and (Leq i k) (Leq j k)
+[i    ] Leq i         i         --> true
+.

@@ -565,8 +565,8 @@ symbol T499: τ int;
 
 symbol rev5 ≔
   T004 + T003 + T002 + T001 + T000;
-debug +ew;
-compute ⇧ rev5;
+//debug +ew;
+//compute ⇧ rev5;
 //ac: 16	insert: 46	perm: 10
 
 /*

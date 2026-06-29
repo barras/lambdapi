@@ -26,8 +26,8 @@ with add (cst 0) $x ↪ $x
 with add $x (cst 0) ↪ $x;
 
 // example:
-compute λ x y z, add (add (var x 1) (add (opp (var y 1)) (var z 1))) (add (var y 1) (var x 1));
-assert x y z ⊢ add (add (var x 1) (add (opp (var y 1)) (var z 1))) (add (var y 1) (var x 1)) ≡ add (var x 2) (var z 1);
+//compute λ x y z, add (add (var x 1) (add (opp (var y 1)) (var z 1))) (add (var y 1) (var x 1));
+//assert x y z ⊢ add (add (var x 1) (add (opp (var y 1)) (var z 1))) (add (var y 1) (var x 1)) ≡ add (var x 2) (var z 1);
 
 // multiplication by a constant (optional)
 symbol mul:ℤ → R → R;
@@ -59,11 +59,11 @@ with ⇧ ($y * Zneg $x) ↪ mul (Zneg $x) (⇧ $y)
 with ⇧ $x ↪ var $x 1; // must be the last rule for ⇧
 
 // example:
-compute λ x y z, ⇧ ((x + ((— y) + z)) + (y + x));
-compute λ x, ⇧ ((— x - — 5) + x + — 4);
+//compute λ x y z, ⇧ ((x + ((— y) + z)) + (y + x));
+//compute λ x, ⇧ ((— x - — 5) + x + — 4);
 
-assert (x y z:ℤ) ⊢ ⇧ ((x + ((— y) + z)) + (y + x)) ≡ ⇧ (2 * x + z);
-assert (x:ℤ) ⊢ ⇧ ((— x - — 5) + x + — 4) ≡ ⇧ 1;
+//assert (x y z:ℤ) ⊢ ⇧ ((x + ((— y) + z)) + (y + x)) ≡ ⇧ (2 * x + z);
+//assert (x:ℤ) ⊢ ⇧ ((— x - — 5) + x + — 4) ≡ ⇧ 1;
 
 // eval function
 symbol ⇓: R → ℤ;
@@ -115,7 +115,108 @@ symbol T38: τ int;
 symbol T39: τ int;
 symbol T40: τ int;
 
-symbol t1 ≔ (⇧
+
+symbol l2 ≔ ⇧(T1 + T2);
+symbol l5 ≔ ⇧(T1 + T2 + T3 + T4 + T5);
+symbol l8 ≔ ⇧(T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8);
+symbol l9 ≔ ⇧(T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T9);
+symbol l92 ≔ ⇧(T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T10);
+symbol l10 ≔ ⇧(T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T9 + T10);
+
+symbol e1 ≔ (⇧
+    (
+        (T1)
+        + (
+            (— 1) * (T1)
+        )
+    )
+);
+symbol e2 ≔ (⇧
+    (
+        (T1 + T2)
+        + (
+            (— 1) * (T2 + T1)
+        )
+    )
+);
+symbol e5 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5)
+        + (
+            (— 1) * (T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+symbol e6 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5 + T6)
+        + (
+            (— 1) * (T6 + T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+symbol e7 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5 + T6 + T7)
+        + (
+            (— 1) * (T7 + T6 + T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+symbol e8 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8)
+        + (
+            (— 1) * (T8 + T7 + T6 + T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+symbol e9 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T9)
+        + (
+            (— 1) * (T9 + T8 + T7 + T6 + T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+symbol e10 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T9 + T10)
+        + (
+            (— 1) * (T10 + T9 + T8 + T7 + T6 + T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+symbol e12 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T9 + T10 + T11 + T12)
+        + (
+            (— 1) * (T12 + T11 + T10 + T9 + T8 + T7 + T6 + T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+symbol e15 ≔ (⇧
+    (
+        (T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T9 + T10 + T11 + T12 + T13 + T14 + T15)
+        + (
+            (— 1) * (T15 + T14 + T13 + T12 + T11 + T10 + T9 + T8 + T7 + T6 + T5 + T4 + T3 + T2 + T1)
+        )
+    )
+);
+
+//debug +ew;
+//compute l2;
+//compute l5;
+//compute l8;
+
+compute e1;
+compute e2;
+compute e5;
+compute e10;
+compute e12;
+compute e15;
+
+/*symbol t1 ≔ (⇧
     (
         (T1 + T2 + T3 + T4 + T5 + T6 + T7 + T8 + T9 + T10 + T11 + T12 + T13 + T14 + T15 + T16 + T17 + T18 + T19 + T20)
         + (
@@ -158,3 +259,4 @@ symbol t4 ≔ (⇧
 );
 compute t4;
 assert ⊢ t4 ≡ ⇧ 0;
+*/
